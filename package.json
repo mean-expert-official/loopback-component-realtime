@@ -1,0 +1,36 @@
+{
+  "name": "@mean-expert/loopback-component-realtime",
+  "version": "1.0.0-alpha.1",
+  "description": "The LoopBack Component that turns this great framework into a powerful real-time platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "IBM",
+    "StrongLoop",
+    "LoopBack",
+    "Angular 2",
+    "LoopBack SDK Builder",
+    "LoopBack Component Real-Time"
+  ],
+  "author": "Jonathan Casarrubias <http://twitter.com/johncasarrubias>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jonathan-casarrubias/loopback-component-realtime"
+  },
+  "dependencies": {
+    "chalk": "^1.1.3",
+    "loopback-context": "^1.0.0",
+    "socket.io": "^1.4.8",
+    "socket.io-client": "^1.4.8"
+  },
+  "devDependencies": {
+    "@types/async": "^2.0.32",
+    "@types/chalk": "^0.4.29",
+    "@types/socket.io": "^1.4.27",
+    "@types/socket.io-client": "^1.4.27",
+    "typescript": "^2.0.2"
+  }
+}

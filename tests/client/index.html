@@ -1,0 +1,31 @@
+<html>
+
+<head>
+  <title>Event Source Test</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var client = io('http://localhost:3000');
+      // subscribe for newly created rooms 
+      client.on('[POST]/api/rooms', function (room) {
+        console.info('Room ', room);
+      });
+      // subscribe for new messages in the room with Id 1
+      client.on('[POST]/api/rooms/1/messages', function (message) {
+        console.info('Message ', message);
+      });
+      client.on('new-message', function (message) {
+        console.info('MESSAGE', message);
+      });
+      client.emit('ME:RT:1://event', {
+        event: 'test',
+        data: 'Super YES!!!!'
+      });
+      client.on('test', function (message) {
+        console.info('RESPONSE ', message);
+      });
+  </script>
+</head>
+
+<body></body>
+
+</html>

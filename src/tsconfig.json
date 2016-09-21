@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "noImplicitAny": true,
+    "mapRoot": "./",
+    "module": "commonjs",
+    "outDir": "../dist",
+    "sourceMap": true,
+    "target": "es5",
+    "typeRoots": [
+      "../node_modules/@types"
+    ],
+    "types": [
+      "chalk",
+      "async",
+      "socket.io",
+      "socket.io-client"
+    ]
+  }
+}
