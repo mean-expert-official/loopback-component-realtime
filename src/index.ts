@@ -9,10 +9,12 @@ import * as chalk from 'chalk';
 /**
  * @module @mean-expert/loopback-component-realtime
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
+ * @license MIT <MEAN Expert - Jonathan Casarrubias>
  * @description
  * 
  * This module is created to implement multiple real-time transportation channels in order
  * to turn the LoopBack Framework into the Most Powerfull NodeJS Real-Time Framework.
+ * This works with the SDK Builder and as a module of the FireLoop.io Framework
  */
 class RealTime {
 
@@ -21,7 +23,7 @@ class RealTime {
     driver  : { name: 'socket.io' },
     debug   : true,
     auth    : true,
-    modules : [ 'PubSub', 'IO' ]
+    modules : [ 'PubSub', 'IO', 'FireLoop' ]
   };
 
   constructor(app: any = undefined, options: OptionsInterface) {

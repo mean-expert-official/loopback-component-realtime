@@ -1,8 +1,17 @@
 "use strict";
 var chalk = require('chalk');
+/**
+ * @module IO
+ * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
+ * @license MIT <MEAN Expert - Jonathan Casarrubias>
+ * @description
+ *
+ * This module is created to implement IO Functionality into the LoopBack Framework.
+ * This works with the SDK Builder and as a module of the FireLoop.io Framework
+ **/
 var IO = (function () {
     function IO(driver, options) {
-        console.log(chalk.yellow("MX-RealTime: IO server enabled using " + options.driver.name + " driver."));
+        console.log(chalk.yellow("MEAN Expert: IO server enabled using " + options.driver.name + " driver."));
         IO.driver = driver;
         IO.options = options;
         return IO;

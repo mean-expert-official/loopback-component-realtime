@@ -6,10 +6,11 @@ export class IODriver implements DriverInterface {
 
   client: any;
   server: any;
+  connections: Array<any> = new Array();
 
   connect(options?: any): any {
     this.server = server(options.server);
-    this.server.on('connection', (socket: any) => this.onConnection(socket));
+    this.onConnection((socket: any) => this.newConnection(socket));
     this.client = client(`http://127.0.0.1:${options.app.get('port')}`);
   }
 
@@ -21,7 +22,16 @@ export class IODriver implements DriverInterface {
     this.client.on(event, callback);
   }
 
-  onConnection(socket: any): void {
+  forEachConnection(handler: Function): void {
+    this.connections.forEach((connection: any) => handler(connection));
+  }
+
+  onConnection(handler: Function): void {
+    this.server.on('connection', handler);
+  }
+
+  newConnection(socket: any): void {
+    this.connections.push(socket);
     socket.on('ME:RT:1://event', (input: { event: string, data: any }) => {
       this.server.emit(input.event, input.data);
     });

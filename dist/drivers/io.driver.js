@@ -3,11 +3,12 @@ var server = require('socket.io');
 var client = require('socket.io-client');
 var IODriver = (function () {
     function IODriver() {
+        this.connections = new Array();
     }
     IODriver.prototype.connect = function (options) {
         var _this = this;
         this.server = server(options.server);
-        this.server.on('connection', function (socket) { return _this.onConnection(socket); });
+        this.onConnection(function (socket) { return _this.newConnection(socket); });
         this.client = client("http://127.0.0.1:" + options.app.get('port'));
     };
     IODriver.prototype.emit = function (event, message) {
@@ -16,8 +17,15 @@ var IODriver = (function () {
     IODriver.prototype.on = function (event, callback) {
         this.client.on(event, callback);
     };
-    IODriver.prototype.onConnection = function (socket) {
+    IODriver.prototype.forEachConnection = function (handler) {
+        this.connections.forEach(function (connection) { return handler(connection); });
+    };
+    IODriver.prototype.onConnection = function (handler) {
+        this.server.on('connection', handler);
+    };
+    IODriver.prototype.newConnection = function (socket) {
         var _this = this;
+        this.connections.push(socket);
         socket.on('ME:RT:1://event', function (input) {
             _this.server.emit(input.event, input.data);
         });

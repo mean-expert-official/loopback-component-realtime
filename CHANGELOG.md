@@ -1,3 +1,10 @@
+
+
+### version 1.0.0-alpha.2
+
+- Fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/9
+- Fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/7
+
 ### version 1.0.0-alpha.1
 
 - First published release

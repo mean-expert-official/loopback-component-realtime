@@ -1,6 +1,6 @@
 {
   "name": "@mean-expert/loopback-component-realtime",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "The LoopBack Component that turns this great framework into a powerful real-time platform",
   "main": "index.js",
   "scripts": {
@@ -12,13 +12,18 @@
     "LoopBack",
     "Angular 2",
     "LoopBack SDK Builder",
-    "LoopBack Component Real-Time"
+    "LoopBack Component Real-Time",
+    "FireLoop"
   ],
-  "author": "Jonathan Casarrubias <http://twitter.com/johncasarrubias>",
+  "author": {
+    "name": "Jonathan Casarrubias",
+    "email": "jcasarrubias@mean.expert",
+    "url": "http://mean.expert"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jonathan-casarrubias/loopback-component-realtime"
+    "url": "https://github.com/mean-expert-official/loopback-component-realtime"
   },
   "dependencies": {
     "chalk": "^1.1.3",
