@@ -7,5 +7,6 @@ export interface DriverInterface {
   onReady?(callback: Function): void;
   newConnection(socket: any): void
   onConnection?(callback: Function): void;
+  removeListener(name: string, listener: Function): void;
   forEachConnection(handler: Function): void;
 }

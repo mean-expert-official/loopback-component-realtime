@@ -14,11 +14,11 @@ export class IODriver implements DriverInterface {
     this.client = client(`http://127.0.0.1:${options.app.get('port')}`);
   }
 
-  emit(event:string, message: any): void {
+  emit(event: string, message: any): void {
     this.server.emit(event, message);
   }
 
-  on(event:string, callback: Function): void {
+  on(event: string, callback: Function): void {
     this.client.on(event, callback);
   }
 
@@ -27,13 +27,19 @@ export class IODriver implements DriverInterface {
   }
 
   onConnection(handler: Function): void {
-    this.server.on('connection', handler);
+    this.server.on('connection', (socket: any) => handler(socket, this.server));
+  }
+  
+  removeListener(name: string, listener: Function): void {
+    this.server.sockets.removeListener(name, listener);
   }
 
   newConnection(socket: any): void {
     this.connections.push(socket);
+    socket.setMaxListeners(0);
     socket.on('ME:RT:1://event', (input: { event: string, data: any }) => {
       this.server.emit(input.event, input.data);
     });
+    socket.on('disconnect', () => socket.removeAllListeners());
   }
 }

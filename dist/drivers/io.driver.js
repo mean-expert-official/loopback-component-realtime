@@ -21,14 +21,20 @@ var IODriver = (function () {
         this.connections.forEach(function (connection) { return handler(connection); });
     };
     IODriver.prototype.onConnection = function (handler) {
-        this.server.on('connection', handler);
+        var _this = this;
+        this.server.on('connection', function (socket) { return handler(socket, _this.server); });
+    };
+    IODriver.prototype.removeListener = function (name, listener) {
+        this.server.sockets.removeListener(name, listener);
     };
     IODriver.prototype.newConnection = function (socket) {
         var _this = this;
         this.connections.push(socket);
+        socket.setMaxListeners(0);
         socket.on('ME:RT:1://event', function (input) {
             _this.server.emit(input.event, input.data);
         });
+        socket.on('disconnect', function () { return socket.removeAllListeners(); });
     };
     return IODriver;
 }());
