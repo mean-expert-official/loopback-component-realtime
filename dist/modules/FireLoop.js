@@ -1,5 +1,5 @@
 "use strict";
-var chalk = require('chalk');
+var logger_1 = require('../logger');
 var async = require('async');
 /**
  * @module FireLoop
@@ -12,7 +12,7 @@ var async = require('async');
  **/
 var FireLoop = (function () {
     function FireLoop(driver, options) {
-        console.log(chalk.yellow("MEAN Expert: FireLoop server enabled using " + options.driver.name + " driver."));
+        logger_1.RealTimeLog.log("FireLoop server enabled using " + options.driver.name + " driver.");
         FireLoop.driver = driver;
         FireLoop.options = options;
         FireLoop.setup();
@@ -36,10 +36,10 @@ var FireLoop = (function () {
                         name: modelName + ".value.pull.request",
                         listener: function listener(filter) {
                             var _filter = Object.assign({}, filter);
-                            console.log(chalk.yellow("MEAN Expert: FireLoop broadcast request received: " + JSON.stringify(_filter)));
+                            logger_1.RealTimeLog.log("FireLoop broadcast request received: " + JSON.stringify(_filter));
                             ref.find(_filter, function (err, data) {
                                 if (err)
-                                    console.log(chalk.red("MEAN Expert: FireLoop server error: " + JSON.stringify(err)));
+                                    logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
                                 socket.emit(modelName + ".value.pull.requested", err ? { error: err } : data);
                             });
                         }
@@ -148,13 +148,13 @@ var FireLoop = (function () {
     FireLoop.broadcast = function (event, options) {
         function listener(filter) {
             var _filter = Object.assign({}, filter);
-            console.log(chalk.yellow("MEAN Expert: FireLoop " + event + " broadcast request received: " + JSON.stringify(_filter)));
+            logger_1.RealTimeLog.log("FireLoop " + event + " broadcast request received: " + JSON.stringify(_filter));
             switch (event) {
                 case 'value':
                 case 'child_added':
                     var broadcast = function (err, data) {
                         if (err)
-                            console.log(chalk.red("MEAN Expert: FireLoop server error: " + JSON.stringify(err)));
+                            logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
                         if (event === 'value') {
                             options.socket.emit(options.modelName + "." + event + ".broadcast", err ? { error: err } : data);
                         }

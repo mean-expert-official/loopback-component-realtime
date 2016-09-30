@@ -1,6 +1,6 @@
 import { DriverInterface } from '../types/driver';
 import { OptionsInterface } from '../types/options';
-import * as chalk from 'chalk';
+import { RealTimeLog } from '../logger';
 /**
  * @module IO
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -16,7 +16,7 @@ export class IO {
   static options: OptionsInterface;
 
   constructor(driver: DriverInterface, options: OptionsInterface) {
-    console.log(chalk.yellow(`MEAN Expert: IO server enabled using ${options.driver.name} driver.`));
+    RealTimeLog.log(`IO server enabled using ${options.driver.name} driver.`);
     IO.driver  = driver;
     IO.options = options;
     return IO;

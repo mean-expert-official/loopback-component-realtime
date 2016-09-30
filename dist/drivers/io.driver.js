@@ -1,6 +1,8 @@
 "use strict";
+var logger_1 = require('../logger');
 var server = require('socket.io');
 var client = require('socket.io-client');
+var ioAuth = require('socketio-auth');
 var IODriver = (function () {
     function IODriver() {
         this.connections = new Array();
@@ -10,6 +12,27 @@ var IODriver = (function () {
         this.server = server(options.server);
         this.onConnection(function (socket) { return _this.newConnection(socket); });
         this.client = client("http://127.0.0.1:" + options.app.get('port'));
+        this.authenticate(options);
+    };
+    IODriver.prototype.authenticate = function (options) {
+        var _this = this;
+        if (options.auth) {
+            logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
+            ioAuth(this.server, {
+                authenticate: function (ctx, token, next) {
+                    var AccessToken = options.app.models.AccessToken;
+                    //verify credentials sent by the client
+                    var token = AccessToken.find({
+                        where: { id: token.id || 0, userId: token.userId || 0 }
+                    }, function (err, tokenInstance) { return next(err, tokenInstance.length > 0 ? true : false); });
+                },
+                postAuthenticate: function () {
+                    _this.server.on('authentication', function (value) {
+                        logger_1.RealTimeLog.log("A user " + value + " has been authenticated over web sockets");
+                    });
+                }
+            });
+        }
     };
     IODriver.prototype.emit = function (event, message) {
         this.server.emit(event, message);
@@ -35,6 +58,7 @@ var IODriver = (function () {
             _this.server.emit(input.event, input.data);
         });
         socket.on('disconnect', function () { return socket.removeAllListeners(); });
+        socket.on('lb-ping', function () { return socket.emit('lb-pong', new Date().getTime() / 1000); });
     };
     return IODriver;
 }());

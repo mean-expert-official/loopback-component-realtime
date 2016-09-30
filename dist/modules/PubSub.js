@@ -1,5 +1,5 @@
 "use strict";
-var chalk = require('chalk');
+var logger_1 = require('../logger');
 /**
  * @module PubSub
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -11,7 +11,7 @@ var chalk = require('chalk');
  */
 var PubSub = (function () {
     function PubSub(driver, options) {
-        console.log(chalk.yellow("MEAN Expert: PubSub server enabled using " + options.driver.name + " driver."));
+        logger_1.RealTimeLog.log("PubSub server enabled using " + options.driver.name + " driver.");
         PubSub.driver = driver;
         PubSub.options = options;
         return PubSub;
@@ -22,17 +22,15 @@ var PubSub = (function () {
                 options.endpoint = options.endpoint.split('?').shift();
             var event_1 = "[" + options.method + "]" + options.endpoint;
             if (PubSub.options.debug) {
-                console.log(chalk.yellow("MEAN Expert: Sending message to " + event_1));
-                console.log(chalk.yellow("MEAN Expert: Message: " + (typeof options.data === 'object' ? JSON.stringify(options.data) : options.data)));
+                logger_1.RealTimeLog.log("Sending message to " + event_1);
+                logger_1.RealTimeLog.log("Message: " + (typeof options.data === 'object' ? JSON.stringify(options.data) : options.data));
             }
             PubSub.driver.emit(event_1, options.data);
             next();
         }
         else {
-            if (PubSub.options.debug) {
-                console.log(chalk.red('MEAN Expert: Option must be an instance of type { method: string, data: object }'));
-                console.log(chalk.red("MEAN Expert: " + options));
-            }
+            logger_1.RealTimeLog.log('Option must be an instance of type { method: string, data: object }');
+            logger_1.RealTimeLog.log(options);
             next();
         }
     };

@@ -3,45 +3,42 @@
 
 A [LoopBack Framework](http://loopback.io) Component that provides publish events over WebSockets.
 
-This module will supersede the [LoopBack Component PubSib] and will implement multiple Real-Time functionalities like PubSub or IO.
-
-This module will also provide the ability to select a transportation driver like socket.io or kafka.
-
-> IMPORTANT: This module is currently in alpha version and is not stable for production purposes.
-
+This module will supersedes the [LoopBack Component PubSub](https://github.com/mean-expert-official/loopback-component-pubsub) and will implement multiple Real-Time functionalities like PubSub, IO and the new [FireLoop Module](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/8.-(NEW)-FireLoop-API).
 
 # Installation
 
-```sh
-$ npm install --save @mean-expert/loopback-component-realtime
-```
+````sh
+$ npm install --save @mean-expert/{loopback-sdk-builder,loopback-component-realtime}
+````
 
-# Setup Module
+# Setup Back End Module
 
 Update the  `server/component-config.json` as follows:
 
-```json
+````json
 {
   "loopback-component-explorer": {
     "mountPath": "/explorer"
   },
   "@mean-expert/loopback-component-realtime": {
     "debug": true,
+    "auth": true,
     "driver": {
-      "name": "socket.io-client | kafka"
+      "name": "socket.io"
     },
     "modules": [
       "IO",
-      "PubSub"
+      "PubSub",
+      "FireLoop"
     ]
   }
 }
 
-```
+````
 
 Update the  `server/model-config.json` as follows:
 
-```json
+````json
 {
     "mixins": [
         "loopback/common/mixins",
@@ -51,4 +48,18 @@ Update the  `server/model-config.json` as follows:
         "../node_modules/loopback-component-realtime/dist/mixins"
     ]
 }
-``
+````
+
+
+
+# PRESENTING FIRELOOP.IO (NEW)
+[![FireLoop.io](https://storage.googleapis.com/mean-expert-images/fireloop-logo.png)](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/8.-(NEW)-FireLoop-API)
+
+# Generate FireLoop Angular 2 Client
+FireLoop Client for Angular 2 Applications are built in when generating your LoopBack SDK. Read the [Following Instructions](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/1.-Install-Builder-&-Build-SDK) in order to automatically generate your software development kit.
+
+
+
+
+
+

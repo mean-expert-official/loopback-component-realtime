@@ -1,6 +1,6 @@
 "use strict";
 var factory_1 = require('./drivers/factory');
-var chalk = require('chalk');
+var logger_1 = require('./logger');
 /**
  * @module @mean-expert/loopback-component-realtime
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -14,8 +14,9 @@ var chalk = require('chalk');
 var RealTime = (function () {
     function RealTime(app, options) {
         if (app === void 0) { app = undefined; }
+        logger_1.RealTimeLog.options = options;
         if (!app) {
-            console.log(chalk.red('MX-RealTime: LoopBack Application Instance is Missing'));
+            logger_1.RealTimeLog.log('LoopBack Application Instance is Missing');
         }
         else {
             app.on('started', function (server) {
@@ -38,21 +39,10 @@ var RealTime = (function () {
             return RealTime.options.app.mx[_module] =
                 require("./modules/" + _module)[_module](RealTime.driver, RealTime.options);
         });
-        if (RealTime.options.driver.name.match(/(socket\.io-client)/) &&
-            RealTime.options.auth) {
-            RealTime.driver.onConnection(RealTime.authenticate);
-        }
-    };
-    RealTime.authenticate = function (token) {
-        console.log(chalk.red('MX-RealTime: Authentication to be implemented'));
-        if (RealTime.options.auth) {
-        }
-        else {
-        }
     };
     RealTime.options = {
         driver: { name: 'socket.io' },
-        debug: true,
+        debug: false,
         auth: true,
         modules: ['PubSub', 'IO', 'FireLoop']
     };

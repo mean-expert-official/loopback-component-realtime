@@ -4,7 +4,7 @@ declare var Object: any;
 interface FireLoopData { id: any, data: any, parent: any }
 import { DriverInterface } from '../types/driver';
 import { OptionsInterface } from '../types/options';
-import * as chalk from 'chalk';
+import { RealTimeLog } from '../logger';
 import * as async from 'async';
 /**
  * @module FireLoop
@@ -21,7 +21,7 @@ export class FireLoop {
   static options: OptionsInterface;
 
   constructor(driver: DriverInterface, options: OptionsInterface) {
-    console.log(chalk.yellow(`MEAN Expert: FireLoop server enabled using ${options.driver.name} driver.`));
+    RealTimeLog.log(`FireLoop server enabled using ${options.driver.name} driver.`);
     FireLoop.driver = driver;
     FireLoop.options = options;
     FireLoop.setup();
@@ -46,9 +46,9 @@ export class FireLoop {
             name: `${modelName}.value.pull.request`,
             listener: function listener(filter: any) {
               let _filter: any = Object.assign({}, filter);
-              console.log(chalk.yellow(`MEAN Expert: FireLoop broadcast request received: ${JSON.stringify(_filter)}`));
+              RealTimeLog.log(`FireLoop broadcast request received: ${JSON.stringify(_filter)}`);
               ref.find(_filter, (err: any, data: any) => {
-                if (err) console.log(chalk.red(`MEAN Expert: FireLoop server error: ${JSON.stringify(err)}`));
+                if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
                 socket.emit(`${modelName}.value.pull.requested`, err ? { error: err } : data);
               });
             }
@@ -165,12 +165,12 @@ export class FireLoop {
   static broadcast(event: string, options: any): void {
     function listener(filter: any) {
       let _filter: any = Object.assign({}, filter);
-      console.log(chalk.yellow(`MEAN Expert: FireLoop ${event} broadcast request received: ${JSON.stringify(_filter)}`));
+      RealTimeLog.log(`FireLoop ${event} broadcast request received: ${JSON.stringify(_filter)}`);
       switch (event) {
         case 'value':
         case 'child_added':
           let broadcast: Function = (err: any, data: any) => {
-            if (err) console.log(chalk.red(`MEAN Expert: FireLoop server error: ${JSON.stringify(err)}`));
+            if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
             if (event === 'value') {
               options.socket.emit(`${options.modelName}.${event}.broadcast`, err ? { error: err } : data);
             } else {

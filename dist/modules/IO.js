@@ -1,5 +1,5 @@
 "use strict";
-var chalk = require('chalk');
+var logger_1 = require('../logger');
 /**
  * @module IO
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -11,7 +11,7 @@ var chalk = require('chalk');
  **/
 var IO = (function () {
     function IO(driver, options) {
-        console.log(chalk.yellow("MEAN Expert: IO server enabled using " + options.driver.name + " driver."));
+        logger_1.RealTimeLog.log("IO server enabled using " + options.driver.name + " driver.");
         IO.driver = driver;
         IO.options = options;
         return IO;
