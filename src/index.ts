@@ -23,7 +23,7 @@ class RealTime {
     driver  : { name: 'socket.io' },
     debug   : false,
     auth    : true,
-    modules : [ 'PubSub', 'IO', 'FireLoop' ]
+    modules : [ 'PubSub', 'IO', 'FireLoop', 'WebRTCSignaler' ]
   };
 
   constructor(app: any = undefined, options: OptionsInterface) {

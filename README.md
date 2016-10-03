@@ -29,7 +29,8 @@ Update the  `server/component-config.json` as follows:
     "modules": [
       "IO",
       "PubSub",
-      "FireLoop"
+      "FireLoop",
+      "WebRTCSignaler"
     ]
   }
 }

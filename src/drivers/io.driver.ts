@@ -47,6 +47,10 @@ export class IODriver implements DriverInterface {
     this.client.on(event, callback);
   }
 
+  of(event: string): void {
+    return this.server.of(event);
+  }
+
   forEachConnection(handler: Function): void {
     this.connections.forEach((connection: any) => handler(connection));
   }
