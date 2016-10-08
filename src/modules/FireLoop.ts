@@ -149,7 +149,7 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
-      (ref: any, next: Function) => ref.findOne({ where: input.data }, (err: any, inst: any) => next(err, ref, inst)),
+      (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id }}, (err: any, inst: any) => next(err, ref, inst)),
       (ref: any, inst: any, next: Function) => {
         if (inst) {
           created = false;

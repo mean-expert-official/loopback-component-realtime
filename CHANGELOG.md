@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-beta.4
+
+- Hot Fix Update Query issues
+
 ### version 1.0.0-beta.3
 
 - Fix: https://github.com/mean-expert-official/loopback-sdk-builder/issues/142

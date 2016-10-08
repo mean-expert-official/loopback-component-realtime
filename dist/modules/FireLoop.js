@@ -130,7 +130,7 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
-            function (ref, next) { return ref.findOne({ where: input.data }, function (err, inst) { return next(err, ref, inst); }); },
+            function (ref, next) { return ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); }); },
             function (ref, inst, next) {
                 if (inst) {
                     created = false;
