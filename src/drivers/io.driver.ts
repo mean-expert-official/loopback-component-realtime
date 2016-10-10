@@ -47,6 +47,10 @@ export class IODriver implements DriverInterface {
     this.client.on(event, callback);
   }
 
+  once(event: string, callback: Function): void {
+    this.client.once(event, callback);
+  }
+
   of(event: string): void {
     return this.server.of(event);
   }

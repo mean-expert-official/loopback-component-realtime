@@ -40,7 +40,7 @@ export class FireLoop {
           let ctx: any = { modelName: modelName, Model: Model, socket: socket };
           FireLoop.events.modify.forEach((event: string) =>
             ctx.socket.on(
-              `${modelName}.${event}`,
+              `${ctx.modelName}.${event}`,
               (input: FireLoopData) => (<any>FireLoop)[event](ctx, input)
             )
           );
@@ -55,17 +55,19 @@ export class FireLoop {
 
   static setupPullRequests(ctx: any): void {
     // Configure Pull Request for read type of Events
-    FireLoop.events.read.forEach((event: string) => ctx.socket.on(
-      `${ctx.modelName}.${event}.pull.request`,
-      (filter: any) => {
-        let _filter: any = Object.assign({}, filter);
-        RealTimeLog.log(`FireLoop broadcast request received: ${JSON.stringify(_filter)}`);
-        ctx.Model.find(_filter, (err: any, data: any) => {
-          if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
-          ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested`, err ? { error: err } : data);
+    FireLoop.events.read.forEach((event: string) => {
+      ctx.socket.on(
+        `${ctx.modelName}.${event}.pull.request`,
+        (filter: any) => {
+          let _filter: any = Object.assign({}, filter);
+          RealTimeLog.log(`FireLoop broadcast request received: ${JSON.stringify(_filter)}`);
+          ctx.Model.find(_filter, (err: any, data: any) => {
+            if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
+            ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested`, err ? { error: err } : data);
+          });
         });
-      })
-    );
+        FireLoop.setupBroadcast(event, ctx);
+    });
   }
 
   static setupScopes(ctx: any): void {
@@ -149,7 +151,7 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
-      (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id }}, (err: any, inst: any) => next(err, ref, inst)),
+      (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst)),
       (ref: any, inst: any, next: Function) => {
         if (inst) {
           created = false;
@@ -197,7 +199,7 @@ export class FireLoop {
     // Response to the client that sent the request
     ctx.socket.emit(
       `${ctx.modelName}.value.result.${ctx.input.id}`,
-      ctx.err ? { error: ctx.err } : ctx.data ||  ctx.removed
+      ctx.err ? { error: ctx.err } : ctx.data || ctx.removed
     );
     if (ctx.data) {
       FireLoop.broadcast('value', ctx);
@@ -211,57 +213,48 @@ export class FireLoop {
     }
     // In any of the operations we call the changes event
     FireLoop.broadcast('changes', ctx);
-    // Avoiding Memory Leaks
-    // setTimeout(() => ctx = null, 5000); TODO: NOT SURE WHEN TO DESTROY THE TEMPORAL OBJECT IT JUST YET
   }
 
   static broadcast(event: string, ctx: any): void {
-    function listener(filter: any) {
+    RealTimeLog.log(`FireLoop ${event} broadcasting`);
+    if (event.match(/(child_changed|child_removed)/)) {
+      FireLoop.driver.emit(`${ctx.modelName}.${event}.broadcast`, ctx.data || ctx.removed);
+    }
+    FireLoop.driver.emit(`${ctx.modelName}.${event}.broadcast.announce`, 1);
+    ctx = null;
+  }
+
+  static setupBroadcast(event: string, ctx: any): void {
+    if (!event.match(/(value|changes|child_added)/)) { return; }
+    RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request`);
+    ctx.socket.on(`${ctx.modelName}.${event}.broadcast.request`, (filter: any) => {
       let _filter: any = Object.assign({}, filter);
       RealTimeLog.log(`FireLoop ${event} broadcast request received: ${JSON.stringify(_filter)}`);
-      switch (event) {
-        case 'value':
-        case 'changes':
-        case 'child_added':
-          let broadcast: Function = (err: any, data: any) => {
-            if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
-            if (event === 'value' ||  event === 'changes') {
-              RealTimeLog.log(`FireLoop ${event} broadcasting: ${JSON.stringify(data)}`);
-              ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, err ? { error: err } : data);
-            } else {
-              data.forEach(
-                (d: any) => ctx.socket.emit(
-                  `${ctx.modelName}.${event}.broadcast`,
-                  err ? { error: err } : d
-                )
-              );
-            }
-          };
-          if (ctx.modelName.match(/\./g)) {
-            FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => {
-              if (!ref) {
-                ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, { error: 'Scope not found' });
-              } else {
-                ref(_filter, broadcast)
-              }
-            });
-          } else {
-            ctx.Model.find(_filter, broadcast);
-          }
-          break;
-        case 'child_changed':
-        case 'child_removed':
-          ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, ctx.data || ctx.removed);
-          break;
-        default:
-          ctx.socket.emit(
-            `${ctx.modelName}.${event}.broadcast`,
-            { error: new Error(`Invalid event ${event}`) }
+      let broadcast: Function = (err: any, data: any) => {
+        if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
+        if (event === 'value' || event === 'changes') {
+          RealTimeLog.log(`FireLoop ${event} broadcasting: ${JSON.stringify(data)}`);
+          ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, err ? { error: err } : data);
+        } else {
+          data.forEach(
+            (d: any) => ctx.socket.emit(
+              `${ctx.modelName}.${event}.broadcast`,
+              err ? { error: err } : d
+            )
           );
+        }
+      };
+      if (ctx.modelName.match(/\./g)) {
+        FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => {
+          if (!ref) {
+            ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, { error: 'Scope not found' });
+          } else {
+            ref(_filter, broadcast)
+          }
+        });
+      } else {
+        ctx.Model.find(_filter, broadcast);
       }
-      FireLoop.driver.removeListener(`${ctx.modelName}.${event}.broadcast.request`, listener);
-    }
-    ctx.socket.once(`${ctx.modelName}.${event}.broadcast.request`, listener);
-    ctx.socket.emit(`${ctx.modelName}.${event}.broadcast.announce`, 1);
+    });
   }
 }

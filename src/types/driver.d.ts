@@ -5,6 +5,7 @@ export interface DriverInterface {
   connect(options?: any): any;
   emit(event:string, message: any): void;
   on(event:string, callback: Function): any;
+  once(event:string, callback: Function): any;
   of(event:string): any;
   onReady?(callback: Function): void;
   newConnection(socket: any): void

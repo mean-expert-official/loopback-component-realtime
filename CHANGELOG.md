@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-beta.5
+
+- fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/19
+
 ### version 1.0.0-beta.4
 
 - Hot Fix Update Query issues

@@ -40,6 +40,9 @@ var IODriver = (function () {
     IODriver.prototype.on = function (event, callback) {
         this.client.on(event, callback);
     };
+    IODriver.prototype.once = function (event, callback) {
+        this.client.once(event, callback);
+    };
     IODriver.prototype.of = function (event) {
         return this.server.of(event);
     };

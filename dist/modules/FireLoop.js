@@ -25,7 +25,7 @@ var FireLoop = (function () {
                 return FireLoop.getReference(modelName, null, function (Model) {
                     var ctx = { modelName: modelName, Model: Model, socket: socket };
                     FireLoop.events.modify.forEach(function (event) {
-                        return ctx.socket.on(modelName + "." + event, function (input) { return FireLoop[event](ctx, input); });
+                        return ctx.socket.on(ctx.modelName + "." + event, function (input) { return FireLoop[event](ctx, input); });
                     });
                     // Setup Relations
                     FireLoop.setupScopes(ctx);
@@ -37,15 +37,18 @@ var FireLoop = (function () {
     };
     FireLoop.setupPullRequests = function (ctx) {
         // Configure Pull Request for read type of Events
-        FireLoop.events.read.forEach(function (event) { return ctx.socket.on(ctx.modelName + "." + event + ".pull.request", function (filter) {
-            var _filter = Object.assign({}, filter);
-            logger_1.RealTimeLog.log("FireLoop broadcast request received: " + JSON.stringify(_filter));
-            ctx.Model.find(_filter, function (err, data) {
-                if (err)
-                    logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
-                ctx.socket.emit(ctx.modelName + "." + event + ".pull.requested", err ? { error: err } : data);
+        FireLoop.events.read.forEach(function (event) {
+            ctx.socket.on(ctx.modelName + "." + event + ".pull.request", function (filter) {
+                var _filter = Object.assign({}, filter);
+                logger_1.RealTimeLog.log("FireLoop broadcast request received: " + JSON.stringify(_filter));
+                ctx.Model.find(_filter, function (err, data) {
+                    if (err)
+                        logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
+                    ctx.socket.emit(ctx.modelName + "." + event + ".pull.requested", err ? { error: err } : data);
+                });
             });
-        }); });
+            FireLoop.setupBroadcast(event, ctx);
+        });
     };
     FireLoop.setupScopes = function (ctx) {
         if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations)
@@ -190,53 +193,48 @@ var FireLoop = (function () {
         }
         // In any of the operations we call the changes event
         FireLoop.broadcast('changes', ctx);
-        // Avoiding Memory Leaks
-        // setTimeout(() => ctx = null, 5000); TODO: NOT SURE WHEN TO DESTROY THE TEMPORAL OBJECT IT JUST YET
     };
     FireLoop.broadcast = function (event, ctx) {
-        function listener(filter) {
+        logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting");
+        if (event.match(/(child_changed|child_removed)/)) {
+            FireLoop.driver.emit(ctx.modelName + "." + event + ".broadcast", ctx.data || ctx.removed);
+        }
+        FireLoop.driver.emit(ctx.modelName + "." + event + ".broadcast.announce", 1);
+        ctx = null;
+    };
+    FireLoop.setupBroadcast = function (event, ctx) {
+        if (!event.match(/(value|changes|child_added)/)) {
+            return;
+        }
+        logger_1.RealTimeLog.log("FireLoop setting up: " + ctx.modelName + "." + event + ".broadcast.request");
+        ctx.socket.on(ctx.modelName + "." + event + ".broadcast.request", function (filter) {
             var _filter = Object.assign({}, filter);
             logger_1.RealTimeLog.log("FireLoop " + event + " broadcast request received: " + JSON.stringify(_filter));
-            switch (event) {
-                case 'value':
-                case 'changes':
-                case 'child_added':
-                    var broadcast_1 = function (err, data) {
-                        if (err)
-                            logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
-                        if (event === 'value' || event === 'changes') {
-                            logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting: " + JSON.stringify(data));
-                            ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : data);
-                        }
-                        else {
-                            data.forEach(function (d) { return ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : d); });
-                        }
-                    };
-                    if (ctx.modelName.match(/\./g)) {
-                        FireLoop.getReference(ctx.modelName, ctx.input, function (ref) {
-                            if (!ref) {
-                                ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", { error: 'Scope not found' });
-                            }
-                            else {
-                                ref(_filter, broadcast_1);
-                            }
-                        });
+            var broadcast = function (err, data) {
+                if (err)
+                    logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
+                if (event === 'value' || event === 'changes') {
+                    logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting: " + JSON.stringify(data));
+                    ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : data);
+                }
+                else {
+                    data.forEach(function (d) { return ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : d); });
+                }
+            };
+            if (ctx.modelName.match(/\./g)) {
+                FireLoop.getReference(ctx.modelName, ctx.input, function (ref) {
+                    if (!ref) {
+                        ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", { error: 'Scope not found' });
                     }
                     else {
-                        ctx.Model.find(_filter, broadcast_1);
+                        ref(_filter, broadcast);
                     }
-                    break;
-                case 'child_changed':
-                case 'child_removed':
-                    ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", ctx.data || ctx.removed);
-                    break;
-                default:
-                    ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", { error: new Error("Invalid event " + event) });
+                });
             }
-            FireLoop.driver.removeListener(ctx.modelName + "." + event + ".broadcast.request", listener);
-        }
-        ctx.socket.once(ctx.modelName + "." + event + ".broadcast.request", listener);
-        ctx.socket.emit(ctx.modelName + "." + event + ".broadcast.announce", 1);
+            else {
+                ctx.Model.find(_filter, broadcast);
+            }
+        });
     };
     FireLoop.events = {
         read: ['value', 'changes'],
