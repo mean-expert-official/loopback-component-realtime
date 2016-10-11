@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-beta.6
+
+- Added missing documentation
+
 ### version 1.0.0-beta.5
 
 - fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/19
