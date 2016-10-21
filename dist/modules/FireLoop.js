@@ -11,12 +11,26 @@ var async = require('async');
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  **/
 var FireLoop = (function () {
+    /**
+    * @method constructor
+    * @param driver: DriverInterface
+    * @param options: OptionsInterface
+    * @description
+    * Initializes FireLoop module by storing a static reference for the driver and
+    * options that will be used. Then it will call the setup method.
+    **/
     function FireLoop(driver, options) {
         logger_1.RealTimeLog.log("FireLoop server enabled using " + options.driver.name + " driver.");
         FireLoop.driver = driver;
         FireLoop.options = options;
         FireLoop.setup();
     }
+    /**
+    * @method setup
+    * @description
+    * Listen for new connections in order to configure each new client connected
+    * by iterating the LoopBack models and configuring the necessary events
+    **/
     FireLoop.setup = function () {
         // Setup Each Connection
         FireLoop.driver.onConnection(function (socket) {
@@ -35,6 +49,12 @@ var FireLoop = (function () {
             });
         });
     };
+    /**
+    * @method setupPullRequest
+    * @description
+    * Listen for connections that requests to pull data without waiting until the next
+    * public broadcast announce.
+    **/
     FireLoop.setupPullRequests = function (ctx) {
         // Configure Pull Request for read type of Events
         FireLoop.events.read.forEach(function (event) {
@@ -50,6 +70,12 @@ var FireLoop = (function () {
             FireLoop.setupBroadcast(event, ctx);
         });
     };
+    /**
+    * @method setupScopes
+    * @description
+    * Listen for connections working with child references, in LoopBack these are called scopes
+    * Basically is setting up the methods for a related method. e.g. Room.messages.upsert()
+    **/
     FireLoop.setupScopes = function (ctx) {
         if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations)
             return;
@@ -67,6 +93,13 @@ var FireLoop = (function () {
             });
         });
     };
+    /**
+    * @method getReference
+    * @description
+    * Returns a model reference, this can be either a Regular Model or a Scoped Model.
+    * For regular models we just return the model as it is, but for scope models (childs)
+    * we return a child model reference by correctly finding it.
+    **/
     FireLoop.getReference = function (modelName, input, next) {
         var ref;
         if (modelName.match(/\./g)) {
@@ -86,9 +119,15 @@ var FireLoop = (function () {
         }
         next(ref);
     };
-    // This method is called from Models and from Scoped Models,
-    // If the create is for Model, we use context model reference.
-    // Else we need to get a custom reference, since its a child
+    /**
+    * @method create
+    * @description
+    * Creates a new instance for either a model or scope model.
+    *
+    * This method is called from Models and from Scoped Models,
+    * If the create is for Model, we use context model reference.
+    * Else we need to get a custom reference, since its a child
+    **/
     FireLoop.create = function (ctx, input) {
         logger_1.RealTimeLog.log("FireLoop starting create: " + ctx.modelName + ": " + JSON.stringify(input));
         async.waterfall([
@@ -107,12 +146,37 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
+            function (ref, next) {
+                if (ref.checkAccess) {
+                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: 'create',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
+                else {
+                    logger_1.RealTimeLog.log(ref);
+                    next(FireLoop.UNAUTHORIZED, ref);
+                }
+            },
             function (ref, next) { return ref.create(input.data, next); }
         ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx)); });
     };
-    // This method is called from Models and from Scoped Models,
-    // If the create is for Model, we use context model reference.
-    // Else we need to get a custom reference, since its a child
+    /**
+    * @method upsert
+    * @description
+    * Creates a new instance from either a model or scope model.
+    *
+    * This method is called from Models and from Scoped Models,
+    * If the create is for Model, we use context model reference.
+    * Else we need to get a custom reference, since its a child
+    **/
     FireLoop.upsert = function (ctx, input) {
         var created;
         logger_1.RealTimeLog.log("FireLoop starting upsert: " + ctx.modelName + ": " + JSON.stringify(input));
@@ -133,6 +197,25 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
+            function (ref, next) {
+                if (ref.checkAccess) {
+                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: 'create',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
+                else {
+                    logger_1.RealTimeLog.log(ref);
+                    next(FireLoop.UNAUTHORIZED, ref);
+                }
+            },
             function (ref, next) { return ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); }); },
             function (ref, inst, next) {
                 if (inst) {
@@ -147,9 +230,15 @@ var FireLoop = (function () {
             }
         ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: created }, ctx)); });
     };
-    // This method is called from Models and from Scoped Models,
-    // If the create is for Model, we use context model reference.
-    // Else we need to get a custom reference, since its a child
+    /**
+    * @method remove
+    * @description
+    * Removes instances from either a model or scope model.
+    *
+    * This method is called from Models and from Scoped Models,
+    * If the create is for Model, we use context model reference.
+    * Else we need to get a custom reference, since its a child
+    **/
     FireLoop.remove = function (ctx, input) {
         logger_1.RealTimeLog.log("FireLoop starting remove: " + ctx.modelName + ": " + JSON.stringify(input));
         async.waterfall([
@@ -168,17 +257,45 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
+            function (ref, next) {
+                if (ref.checkAccess) {
+                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: ref.destroy ? 'destroy' : 'removeById',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
+                else {
+                    logger_1.RealTimeLog.log(ref);
+                    next(FireLoop.UNAUTHORIZED, ref);
+                }
+            },
             function (ref, next) { return ref.destroy
                 ? ref.destroy(input.data.id, next)
                 : ref.removeById(input.data.id, next); }
         ], function (err) { return FireLoop.publish(Object.assign({ err: err, input: input, removed: input.data }, ctx)); });
     };
-    // Context will be destroyed everytime, make sure the ctx passed is a
-    // custom copy for current request or else bad things will happen :P.
-    // WARNING: Do not pass the root context.
+    /**
+    * @method remove
+    * @description
+    * Publish gateway that will broadcast according the specific case.
+    *
+    * Context will be destroyed everytime, make sure the ctx passed is a
+    * custom copy for current request or else bad things will happen :P.
+    * WARNING: Do not pass the root context.
+    **/
     FireLoop.publish = function (ctx) {
         // Response to the client that sent the request
         ctx.socket.emit(ctx.modelName + ".value.result." + ctx.input.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
+        if (ctx.err) {
+            return;
+        }
         if (ctx.data) {
             FireLoop.broadcast('value', ctx);
             if (ctx.created) {
@@ -194,6 +311,16 @@ var FireLoop = (function () {
         // In any of the operations we call the changes event
         FireLoop.broadcast('changes', ctx);
     };
+    /**
+    * @method broadcast
+    * @description
+    * Announces a broadcast, emit data from changed or removed childs,
+    * then it will clean the context.
+    *
+    * Context will be destroyed everytime, make sure the ctx passed is a
+    * custom copy for current request or else bad things will happen :P.
+    * WARNING: Do not pass the root context.
+    **/
     FireLoop.broadcast = function (event, ctx) {
         logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting");
         if (event.match(/(child_changed|child_removed)/)) {
@@ -202,6 +329,14 @@ var FireLoop = (function () {
         FireLoop.driver.emit(ctx.modelName + "." + event + ".broadcast.announce", 1);
         ctx = null;
     };
+    /**
+    * @method setupBroadcast
+    * @description
+    * Setup the actual broadcast process, once it is announced byt the broadcast method.
+    *
+    * Anyway, this setup needs to be done once and prior any broadcast, so it is
+    * configured when the connection is made, before any broadcast announce.
+    **/
     FireLoop.setupBroadcast = function (event, ctx) {
         if (!event.match(/(value|changes|child_added)/)) {
             return;
@@ -221,21 +356,45 @@ var FireLoop = (function () {
                     data.forEach(function (d) { return ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : d); });
                 }
             };
+            var remoteMethod = { name: 'find', aliases: [] };
             if (ctx.modelName.match(/\./g)) {
                 FireLoop.getReference(ctx.modelName, ctx.input, function (ref) {
                     if (!ref) {
                         ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", { error: 'Scope not found' });
                     }
                     else {
-                        ref(_filter, broadcast);
+                        ref.checkAccess(ctx.socket.token, null, remoteMethod, {}, function (err, access) {
+                            if (access) {
+                                ref(_filter, broadcast);
+                            }
+                            else {
+                                broadcast(FireLoop.UNAUTHORIZED);
+                            }
+                        });
                     }
                 });
             }
             else {
-                ctx.Model.find(_filter, broadcast);
+                ctx.Model.checkAccess(ctx.socket.token, null, remoteMethod, {}, function (err, access) {
+                    if (access) {
+                        ctx.Model.find(_filter, broadcast);
+                    }
+                    else {
+                        broadcast(FireLoop.UNAUTHORIZED);
+                    }
+                });
             }
         });
     };
+    /**
+     * @property UNAUTHORIZED: string
+     * Constant for UNAUTHORIZED Events
+     **/
+    FireLoop.UNAUTHORIZED = '401 Unauthorized Event';
+    /**
+     * @property events: OptionsInterface
+     * The options object that are injected from the main module
+     **/
     FireLoop.events = {
         read: ['value', 'changes'],
         modify: ['create', 'upsert', 'remove'],

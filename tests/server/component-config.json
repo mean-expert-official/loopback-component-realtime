@@ -2,7 +2,5 @@
   "loopback-component-explorer": {
     "mountPath": "/explorer"
   },
-  "@mean-expert/loopback-component-realtime/dist": {
-    "test": true
-  }
+  "@mean-expert/loopback-component-realtime": {}
 }

@@ -1,9 +1,10 @@
 declare var module: any;
 declare var require: any;
 declare var Object: any;
-interface FireLoopData { id: any, data: any, parent: any }
 import { DriverInterface } from '../types/driver';
 import { OptionsInterface } from '../types/options';
+import { EventsInterface } from '../types/events';
+import { FireLoopData } from '../types/fireloop-data';
 import { RealTimeLog } from '../logger';
 import * as async from 'async';
 /**
@@ -16,21 +17,49 @@ import * as async from 'async';
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  **/
 export class FireLoop {
-
+  /**
+   * @property UNAUTHORIZED: string
+   * Constant for UNAUTHORIZED Events
+   **/
+  static UNAUTHORIZED: string = '401 Unauthorized Event';
+  /**
+   * @property driver: DriverInterface
+   * The transportation driver that will be used by this module
+   **/
   static driver: DriverInterface;
+  /**
+   * @property options: OptionsInterface
+   * The options object that are injected from the main module
+   **/
   static options: OptionsInterface;
-  static events: { read: string[], modify: string[] } = {
+  /**
+   * @property events: OptionsInterface
+   * The options object that are injected from the main module
+   **/
+  static events: EventsInterface = {
     read: ['value', 'changes'],
     modify: ['create', 'upsert', 'remove'],
   };
-
+  /**
+  * @method constructor
+  * @param driver: DriverInterface
+  * @param options: OptionsInterface
+  * @description
+  * Initializes FireLoop module by storing a static reference for the driver and
+  * options that will be used. Then it will call the setup method.
+  **/
   constructor(driver: DriverInterface, options: OptionsInterface) {
     RealTimeLog.log(`FireLoop server enabled using ${options.driver.name} driver.`);
     FireLoop.driver = driver;
     FireLoop.options = options;
     FireLoop.setup();
   }
-
+  /**
+  * @method setup
+  * @description
+  * Listen for new connections in order to configure each new client connected
+  * by iterating the LoopBack models and configuring the necessary events
+  **/
   static setup(): void {
     // Setup Each Connection
     FireLoop.driver.onConnection((socket: any) => {
@@ -52,7 +81,12 @@ export class FireLoop {
       );
     });
   }
-
+  /**
+  * @method setupPullRequest
+  * @description
+  * Listen for connections that requests to pull data without waiting until the next
+  * public broadcast announce.
+  **/
   static setupPullRequests(ctx: any): void {
     // Configure Pull Request for read type of Events
     FireLoop.events.read.forEach((event: string) => {
@@ -66,10 +100,15 @@ export class FireLoop {
             ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested`, err ? { error: err } : data);
           });
         });
-        FireLoop.setupBroadcast(event, ctx);
+      FireLoop.setupBroadcast(event, ctx);
     });
   }
-
+  /**
+  * @method setupScopes
+  * @description
+  * Listen for connections working with child references, in LoopBack these are called scopes
+  * Basically is setting up the methods for a related method. e.g. Room.messages.upsert()
+  **/
   static setupScopes(ctx: any): void {
     if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations) return;
     Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach((scope: string) => {
@@ -89,7 +128,13 @@ export class FireLoop {
       });
     });
   }
-
+  /**
+  * @method getReference
+  * @description
+  * Returns a model reference, this can be either a Regular Model or a Scoped Model.
+  * For regular models we just return the model as it is, but for scope models (childs)
+  * we return a child model reference by correctly finding it.
+  **/
   static getReference(modelName: string, input: FireLoopData, next: Function): any {
     let ref: any;
     if (modelName.match(/\./g)) {
@@ -106,9 +151,15 @@ export class FireLoop {
     }
     next(ref);
   }
-  // This method is called from Models and from Scoped Models,
-  // If the create is for Model, we use context model reference.
-  // Else we need to get a custom reference, since its a child
+  /**
+  * @method create
+  * @description
+  * Creates a new instance for either a model or scope model.
+  *
+  * This method is called from Models and from Scoped Models,
+  * If the create is for Model, we use context model reference.
+  * Else we need to get a custom reference, since its a child
+  **/
   static create(ctx: any, input: FireLoopData): void {
     RealTimeLog.log(`FireLoop starting create: ${ctx.modelName}: ${JSON.stringify(input)}`);
     async.waterfall([
@@ -125,14 +176,37 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
+      (ref: any, next: Function) => {
+        if (ref.checkAccess) {
+          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: 'create',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else {
+          RealTimeLog.log(ref);
+          next(FireLoop.UNAUTHORIZED, ref);
+        }
+      },
       (ref: any, next: Function) => ref.create(input.data, next)
     ], (err: any, data: any) => FireLoop.publish(
       Object.assign({ err, input, data, created: true }, ctx))
     );
   }
-  // This method is called from Models and from Scoped Models,
-  // If the create is for Model, we use context model reference.
-  // Else we need to get a custom reference, since its a child
+  /**
+  * @method upsert
+  * @description
+  * Creates a new instance from either a model or scope model.
+  *
+  * This method is called from Models and from Scoped Models,
+  * If the create is for Model, we use context model reference.
+  * Else we need to get a custom reference, since its a child
+  **/
   static upsert(ctx: any, input: FireLoopData): void {
     let created: boolean;
     RealTimeLog.log(`FireLoop starting upsert: ${ctx.modelName}: ${JSON.stringify(input)}`);
@@ -151,6 +225,23 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
+      (ref: any, next: Function) => {
+        if (ref.checkAccess) {
+          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: 'create',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else {
+          RealTimeLog.log(ref);
+          next(FireLoop.UNAUTHORIZED, ref);
+        }
+      },
       (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst)),
       (ref: any, inst: any, next: Function) => {
         if (inst) {
@@ -166,9 +257,15 @@ export class FireLoop {
       Object.assign({ err, input, data, created }, ctx))
     );
   }
-  // This method is called from Models and from Scoped Models,
-  // If the create is for Model, we use context model reference.
-  // Else we need to get a custom reference, since its a child
+  /**
+  * @method remove
+  * @description
+  * Removes instances from either a model or scope model.
+  *
+  * This method is called from Models and from Scoped Models,
+  * If the create is for Model, we use context model reference.
+  * Else we need to get a custom reference, since its a child
+  **/
   static remove(ctx: any, input: FireLoopData): void {
     RealTimeLog.log(`FireLoop starting remove: ${ctx.modelName}: ${JSON.stringify(input)}`);
     async.waterfall([
@@ -185,6 +282,23 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
+      (ref: any, next: Function) => {
+        if (ref.checkAccess) {
+          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: ref.destroy ? 'destroy' : 'removeById',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else {
+          RealTimeLog.log(ref);
+          next(FireLoop.UNAUTHORIZED, ref);
+        }
+      },
       (ref: any, next: Function) => ref.destroy
         ? ref.destroy(input.data.id, next)
         : ref.removeById(input.data.id, next)
@@ -192,15 +306,22 @@ export class FireLoop {
       Object.assign({ err, input, removed: input.data }, ctx))
     );
   }
-  // Context will be destroyed everytime, make sure the ctx passed is a
-  // custom copy for current request or else bad things will happen :P.
-  // WARNING: Do not pass the root context.
+  /**
+  * @method remove
+  * @description
+  * Publish gateway that will broadcast according the specific case.
+  *
+  * Context will be destroyed everytime, make sure the ctx passed is a
+  * custom copy for current request or else bad things will happen :P.
+  * WARNING: Do not pass the root context.
+  **/
   static publish(ctx: any): void {
     // Response to the client that sent the request
     ctx.socket.emit(
       `${ctx.modelName}.value.result.${ctx.input.id}`,
       ctx.err ? { error: ctx.err } : ctx.data || ctx.removed
     );
+    if (ctx.err) { return; }
     if (ctx.data) {
       FireLoop.broadcast('value', ctx);
       if (ctx.created) {
@@ -214,7 +335,16 @@ export class FireLoop {
     // In any of the operations we call the changes event
     FireLoop.broadcast('changes', ctx);
   }
-
+  /**
+  * @method broadcast
+  * @description
+  * Announces a broadcast, emit data from changed or removed childs,
+  * then it will clean the context.
+  *
+  * Context will be destroyed everytime, make sure the ctx passed is a
+  * custom copy for current request or else bad things will happen :P.
+  * WARNING: Do not pass the root context.
+  **/
   static broadcast(event: string, ctx: any): void {
     RealTimeLog.log(`FireLoop ${event} broadcasting`);
     if (event.match(/(child_changed|child_removed)/)) {
@@ -223,7 +353,14 @@ export class FireLoop {
     FireLoop.driver.emit(`${ctx.modelName}.${event}.broadcast.announce`, 1);
     ctx = null;
   }
-
+  /**
+  * @method setupBroadcast
+  * @description
+  * Setup the actual broadcast process, once it is announced byt the broadcast method.
+  *
+  * Anyway, this setup needs to be done once and prior any broadcast, so it is
+  * configured when the connection is made, before any broadcast announce.
+  **/
   static setupBroadcast(event: string, ctx: any): void {
     if (!event.match(/(value|changes|child_added)/)) { return; }
     RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request`);
@@ -244,16 +381,41 @@ export class FireLoop {
           );
         }
       };
+
+      let remoteMethod: { name: string, aliases: string[] } = { name: 'find', aliases: [] };
+
       if (ctx.modelName.match(/\./g)) {
         FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => {
           if (!ref) {
             ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, { error: 'Scope not found' });
           } else {
-            ref(_filter, broadcast)
+            ref.checkAccess(
+              ctx.socket.token,
+              null,
+              remoteMethod,
+              {},
+              function (err: any, access: boolean) {
+                if (access) {
+                  ref(_filter, broadcast);
+                } else {
+                  broadcast(FireLoop.UNAUTHORIZED);
+                }
+            });
           }
         });
       } else {
-        ctx.Model.find(_filter, broadcast);
+        ctx.Model.checkAccess(
+          ctx.socket.token,
+          null,
+          remoteMethod,
+          {},
+          function (err: any, access: boolean) {
+            if (access) {
+              ctx.Model.find(_filter, broadcast);
+            } else {
+              broadcast(FireLoop.UNAUTHORIZED);
+            }
+         });
       }
     });
   }

@@ -19,12 +19,20 @@ var IODriver = (function () {
         if (options.auth) {
             logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
             ioAuth(this.server, {
-                authenticate: function (ctx, token, next) {
+                authenticate: function (socket, token, next) {
                     var AccessToken = options.app.models.AccessToken;
                     //verify credentials sent by the client
-                    var token = AccessToken.find({
+                    var token = AccessToken.findOne({
                         where: { id: token.id || 0, userId: token.userId || 0 }
-                    }, function (err, tokenInstance) { return next(err, tokenInstance.length > 0 ? true : false); });
+                    }, function (err, tokenInstance) {
+                        if (tokenInstance) {
+                            socket.token = tokenInstance;
+                            next(err, true);
+                        }
+                        else {
+                            next(err, false);
+                        }
+                    });
                 },
                 postAuthenticate: function () {
                     _this.server.on('authentication', function (value) {

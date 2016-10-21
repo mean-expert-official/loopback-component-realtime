@@ -23,12 +23,19 @@ export class IODriver implements DriverInterface {
     if (options.auth) {
       RealTimeLog.log('RTC authentication mechanism enabled');
       ioAuth(this.server, {
-        authenticate: (ctx: any, token: any, next: Function) => {
+        authenticate: (socket: any, token: any, next: Function) => {
           var AccessToken = options.app.models.AccessToken;
           //verify credentials sent by the client
-          var token = AccessToken.find({
+          var token = AccessToken.findOne({
             where: { id: token.id || 0, userId: token.userId || 0 }
-          }, (err: any, tokenInstance: any) => next(err, tokenInstance.length > 0 ? true : false));
+          }, (err: any, tokenInstance: any) => {
+            if (tokenInstance) {
+              socket.token = tokenInstance;
+              next(err, true);
+            } else {
+              next(err, false);
+            }
+          });
         },
         postAuthenticate: () => {
           this.server.on('authentication', (value: any) => {
