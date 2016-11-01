@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-beta.8
+
+- Fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/22
+
 ### version 1.0.0-beta.7
 
 - Fix: https://github.com/mean-expert-official/loopback-sdk-builder/issues/164

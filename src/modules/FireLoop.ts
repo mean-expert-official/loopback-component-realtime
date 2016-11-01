@@ -37,7 +37,7 @@ export class FireLoop {
    * The options object that are injected from the main module
    **/
   static events: EventsInterface = {
-    read: ['value', 'changes'],
+    read: ['value', 'change', 'stats'],
     modify: ['create', 'upsert', 'remove'],
   };
   /**
@@ -95,10 +95,20 @@ export class FireLoop {
         (filter: any) => {
           let _filter: any = Object.assign({}, filter);
           RealTimeLog.log(`FireLoop broadcast request received: ${JSON.stringify(_filter)}`);
-          ctx.Model.find(_filter, (err: any, data: any) => {
+          let emit: any = (err: any, data: any) => {
             if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
             ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested`, err ? { error: err } : data);
-          });
+          };
+          // TODO: Verify if this works with child references?
+          switch(event) {
+            case 'value':
+            case 'change':
+              ctx.Model.find(_filter, emit);
+            break;
+            case 'stats':
+              ctx.Model.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, emit);
+            break;
+          }
         });
       FireLoop.setupBroadcast(event, ctx);
     });
@@ -332,8 +342,9 @@ export class FireLoop {
     } else if (ctx.removed) {
       FireLoop.broadcast('child_removed', ctx);
     }
-    // In any of the operations we call the changes event
-    FireLoop.broadcast('changes', ctx);
+    // In any of the operations we call the changesevent
+    FireLoop.broadcast('change', ctx);
+    FireLoop.broadcast('stats', ctx);
   }
   /**
   * @method broadcast
@@ -362,14 +373,17 @@ export class FireLoop {
   * configured when the connection is made, before any broadcast announce.
   **/
   static setupBroadcast(event: string, ctx: any): void {
-    if (!event.match(/(value|changes|child_added)/)) { return; }
+    if (!event.match(/(value|change|stats|child_added)/)) { return; }
     RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request`);
     ctx.socket.on(`${ctx.modelName}.${event}.broadcast.request`, (filter: any) => {
+      
       let _filter: any = Object.assign({}, filter);
       RealTimeLog.log(`FireLoop ${event} broadcast request received: ${JSON.stringify(_filter)}`);
+
+      // Standard Broadcast Function (Will be used in any of the cases).
       let broadcast: Function = (err: any, data: any) => {
         if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
-        if (event === 'value' || event === 'changes') {
+        if (event.match(/(value|change|stats)/)) {
           RealTimeLog.log(`FireLoop ${event} broadcasting: ${JSON.stringify(data)}`);
           ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, err ? { error: err } : data);
         } else {
@@ -382,41 +396,49 @@ export class FireLoop {
         }
       };
 
-      let remoteMethod: { name: string, aliases: string[] } = { name: 'find', aliases: [] };
+      // Define the name of the method
+      let remoteMethod: { name: string, aliases: string[] } = { name: '', aliases: [] };
+      if (event === 'stats') {
+        remoteMethod.name = 'stats';
+      } else {
+        remoteMethod.name = 'find';
+      }
 
-      if (ctx.modelName.match(/\./g)) {
-        FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => {
-          if (!ref) {
-            ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, { error: 'Scope not found' });
+      // Progress of fetching and broadcasting the data
+      async.waterfall([
+        // Get Reference
+        (next: Function) => {
+          if (ctx.modelName.match(/\./g)) {
+            FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => next(null, ref));
           } else {
-            ref.checkAccess(
-              ctx.socket.token,
-              null,
-              remoteMethod,
-              {},
-              function (err: any, access: boolean) {
-                if (access) {
+            next(null, ctx.Model);
+          }
+        },
+        // Check for Access
+        (ref: any, next: Function) => {
+          ref.checkAccess(ctx.socket.token, null, remoteMethod, {}, (err: any, hasAccess: boolean) => next(err, hasAccess, ref));
+        },
+        // Make the right call if accessed
+        (hasAccess: boolean, ref: any, next: Function) => {
+          if (!hasAccess) {
+            broadcast(FireLoop.UNAUTHORIZED);
+            next();
+          } else {
+            switch(remoteMethod.name) {
+              case 'find':
+                if (ctx.modelName.match(/\./g)) {
                   ref(_filter, broadcast);
                 } else {
-                  broadcast(FireLoop.UNAUTHORIZED);
+                  ref.find(_filter, broadcast);
                 }
-            });
-          }
-        });
-      } else {
-        ctx.Model.checkAccess(
-          ctx.socket.token,
-          null,
-          remoteMethod,
-          {},
-          function (err: any, access: boolean) {
-            if (access) {
-              ctx.Model.find(_filter, broadcast);
-            } else {
-              broadcast(FireLoop.UNAUTHORIZED);
+              break;
+              case 'stats':
+                ref.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, broadcast);
+              break;
             }
-         });
-      }
+          }
+        }
+      ]);
     });
   }
 }
