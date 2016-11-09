@@ -45,8 +45,21 @@ var FireLoop = (function () {
                     FireLoop.setupScopes(ctx);
                     // Setup Pull Requests
                     FireLoop.setupPullRequests(ctx);
+                    // Setup Relation Request
+                    FireLoop.setupRelationRequest(ctx);
                 });
             });
+        });
+    };
+    /**
+    * @method setupRelationRequest
+    * @description
+    * Listen for connections that requests relation data.
+    **/
+    FireLoop.setupRelationRequest = function (ctx) {
+        ctx.socket.on(ctx.modelName + ".relation.request", function (input) {
+            var model = ctx.Model.relations[input.relation].modelTo.sharedClass.name;
+            ctx.socket.emit(ctx.modelName + ".relation.request.result", { name: model });
         });
     };
     /**
@@ -170,6 +183,19 @@ var FireLoop = (function () {
                         }
                     });
                 }
+                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: 'create',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
                 else {
                     logger_1.RealTimeLog.log(ref);
                     next(FireLoop.UNAUTHORIZED, ref);
@@ -210,6 +236,19 @@ var FireLoop = (function () {
             function (ref, next) {
                 if (ref.checkAccess) {
                     ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: 'create',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
+                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
                         name: 'create',
                         aliases: []
                     }, {}, function (err, access) {
@@ -270,6 +309,19 @@ var FireLoop = (function () {
             function (ref, next) {
                 if (ref.checkAccess) {
                     ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+                        name: ref.destroy ? 'destroy' : 'removeById',
+                        aliases: []
+                    }, {}, function (err, access) {
+                        if (access) {
+                            next(null, ref);
+                        }
+                        else {
+                            next(FireLoop.UNAUTHORIZED, ref);
+                        }
+                    });
+                }
+                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
                         name: ref.destroy ? 'destroy' : 'removeById',
                         aliases: []
                     }, {}, function (err, access) {
@@ -432,4 +484,4 @@ var FireLoop = (function () {
     return FireLoop;
 }());
 exports.FireLoop = FireLoop;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/FireLoop.js.map
+//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/modules/FireLoop.js.map
