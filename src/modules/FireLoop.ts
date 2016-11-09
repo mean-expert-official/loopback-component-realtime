@@ -77,8 +77,21 @@ export class FireLoop {
           FireLoop.setupScopes(ctx);
           // Setup Pull Requests
           FireLoop.setupPullRequests(ctx);
+          // Setup Relation Request
+          FireLoop.setupRelationRequest(ctx);
         })
       );
+    });
+  }
+  /**
+  * @method setupRelationRequest
+  * @description
+  * Listen for connections that requests relation data.
+  **/
+  static setupRelationRequest(ctx: any) {
+    ctx.socket.on(`${ctx.modelName}.relation.request`, (input: any) => {
+      let model = ctx.Model.relations[input.relation].modelTo.sharedClass.name;
+      ctx.socket.emit(`${ctx.modelName}.relation.request.result`, { name: model});
     });
   }
   /**
@@ -198,7 +211,18 @@ export class FireLoop {
               next(FireLoop.UNAUTHORIZED, ref);
             }
           });
-        } else {
+        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: 'create',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else{
           RealTimeLog.log(ref);
           next(FireLoop.UNAUTHORIZED, ref);
         }
@@ -247,7 +271,18 @@ export class FireLoop {
               next(FireLoop.UNAUTHORIZED, ref);
             }
           });
-        } else {
+        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: 'create',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else{
           RealTimeLog.log(ref);
           next(FireLoop.UNAUTHORIZED, ref);
         }
@@ -304,7 +339,18 @@ export class FireLoop {
               next(FireLoop.UNAUTHORIZED, ref);
             }
           });
-        } else {
+        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
+          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
+            name: ref.destroy ? 'destroy' : 'removeById',
+            aliases: []
+          }, {}, function (err: any, access: boolean) {
+            if (access) {
+              next(null, ref);
+            } else {
+              next(FireLoop.UNAUTHORIZED, ref);
+            }
+          });
+        } else{
           RealTimeLog.log(ref);
           next(FireLoop.UNAUTHORIZED, ref);
         }

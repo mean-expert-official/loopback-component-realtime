@@ -49,4 +49,4 @@ var RealTime = (function () {
     return RealTime;
 }());
 module.exports = RealTime;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/index.js.map
+//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/index.js.map

@@ -6,4 +6,4 @@
  * This interface defines the contract for data that will be transported from server
  * to clients and backwards.
  */
-export interface FireLoopData { id: any, data: any, parent: any }
+export interface FireLoopData { id: any, data: any, parent: any, current: any}

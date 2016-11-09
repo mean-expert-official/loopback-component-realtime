@@ -37,4 +37,4 @@ var PubSub = (function () {
     return PubSub;
 }());
 exports.PubSub = PubSub;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/PubSub.js.map
+//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/modules/PubSub.js.map

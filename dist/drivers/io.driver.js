@@ -77,4 +77,4 @@ var IODriver = (function () {
     return IODriver;
 }());
 exports.IODriver = IODriver;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/drivers/io.driver.js.map
+//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/drivers/io.driver.js.map
