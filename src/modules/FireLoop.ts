@@ -1,6 +1,7 @@
 declare var module: any;
 declare var require: any;
 declare var Object: any;
+import { SubscriptionInterface } from '../types/subscription';
 import { DriverInterface } from '../types/driver';
 import { OptionsInterface } from '../types/options';
 import { EventsInterface } from '../types/events';
@@ -37,9 +38,15 @@ export class FireLoop {
    * The options object that are injected from the main module
    **/
   static events: EventsInterface = {
-    read: ['value', 'change', 'stats'],
-    modify: ['create', 'upsert', 'remove'],
+    readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
+    writings: ['create', 'upsert', 'remove'],
   };
+  /**
+   * @property context {[ id: number ]: {[ id: number ]: Object }}
+   * Context container, it will temporally store contexts. These
+   * are automatically deleted when client disconnects.
+   **/
+  static contexts: { [id: number]: { [id: number]: Object } } = {};
   /**
   * @method constructor
   * @param driver: DriverInterface
@@ -63,92 +70,141 @@ export class FireLoop {
   static setup(): void {
     // Setup Each Connection
     FireLoop.driver.onConnection((socket: any) => {
+      socket.connContextId = FireLoop.buildId();
+      FireLoop.contexts[socket.connContextId] = {};
       // Setup On Set Methods
       Object.keys(FireLoop.options.app.models).forEach((modelName: string) =>
         FireLoop.getReference(modelName, null, (Model: any) => {
-          let ctx: any = { modelName: modelName, Model: Model, socket: socket };
-          FireLoop.events.modify.forEach((event: string) =>
-            ctx.socket.on(
-              `${ctx.modelName}.${event}`,
-              (input: FireLoopData) => (<any>FireLoop)[event](ctx, input)
-            )
-          );
-          // Setup Relations
-          FireLoop.setupScopes(ctx);
-          // Setup Pull Requests
-          FireLoop.setupPullRequests(ctx);
-          // Setup Relation Request
-          FireLoop.setupRelationRequest(ctx);
+          // Setup reference subscriptions
+          socket.on(`Subscribe.${modelName}`, (subscription: SubscriptionInterface) => {
+            FireLoop.contexts[socket.connContextId][subscription.id] = {
+              modelName, Model, socket, subscription
+            };
+            // Iterate for writting events
+            FireLoop.events.writings.forEach((event: string) => {
+              FireLoop.setupModelWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+              FireLoop.setupScopeWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+            });
+            // Iterate for reading events
+            FireLoop.events.readings.forEach((event: string) => {
+              FireLoop.setupModelReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+              FireLoop.setupScopeReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+            });
+          });
         })
       );
+      // Clean client contexts from the server memory when client disconnects :D
+      socket.on('disconnect', () => {
+        RealTimeLog.log(`FireLoop is releasing context three with id ${socket.connContextId} from memory`);
+        delete FireLoop.contexts[socket.connContextId];
+      });
     });
   }
   /**
-  * @method setupRelationRequest
+  * @method setupModelWritings
   * @description
-  * Listen for connections that requests relation data.
-  **/
-  static setupRelationRequest(ctx: any) {
-    ctx.socket.on(`${ctx.modelName}.relation.request`, (input: any) => {
-      let model = ctx.Model.relations[input.relation].modelTo.sharedClass.name;
-      ctx.socket.emit(`${ctx.modelName}.relation.request.result`, { name: model});
-    });
+  * setup writting events for root models
+   */
+  static setupModelWritings(ctx: any, event: string): void {
+    ctx.socket.on(
+      `${ctx.modelName}.${event}.${ctx.subscription.id}`,
+      (input: FireLoopData) => (<any>FireLoop)[event](ctx, input)
+    )
   }
   /**
-  * @method setupPullRequest
+  * @method setupModelReading
   * @description
   * Listen for connections that requests to pull data without waiting until the next
   * public broadcast announce.
   **/
-  static setupPullRequests(ctx: any): void {
-    // Configure Pull Request for read type of Events
-    FireLoop.events.read.forEach((event: string) => {
-      ctx.socket.on(
-        `${ctx.modelName}.${event}.pull.request`,
-        (filter: any) => {
-          let _filter: any = Object.assign({}, filter);
-          RealTimeLog.log(`FireLoop broadcast request received: ${JSON.stringify(_filter)}`);
-          let emit: any = (err: any, data: any) => {
-            if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
-            ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested`, err ? { error: err } : data);
-          };
-          // TODO: Verify if this works with child references?
-          switch(event) {
-            case 'value':
-            case 'change':
-              ctx.Model.find(_filter, emit);
+  static setupModelReadings(ctx: any, event: string): void {
+    // Pull Request Listener
+    ctx.socket.on(
+      `${ctx.modelName}.${event}.pull.request.${ctx.subscription.id}`,
+      (request: any) => {
+        let _request: any = Object.assign({}, request);
+        RealTimeLog.log(`FireLoop model pull request received: ${JSON.stringify(_request.filter)}`);
+        let emit: any = (err: any, data: any) => {
+          if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
+          ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested.${ctx.subscription.id}`, err ? { error: err } : data);
+        };
+        // This works only for Root Models, related models are configured in setupScopes method
+        switch (event) {
+          case 'value':
+          case 'change':
+            ctx.Model.find(_request.filter, emit);
             break;
-            case 'stats':
-              ctx.Model.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, emit);
+          case 'stats':
+            ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
             break;
-          }
-        });
-      FireLoop.setupBroadcast(event, ctx);
-    });
+        }
+      }
+    );
+    FireLoop.setupBroadcast(ctx, event);
   }
   /**
-  * @method setupScopes
+  * @method setupScopeWritings
   * @description
-  * Listen for connections working with child references, in LoopBack these are called scopes
-  * Basically is setting up the methods for a related method. e.g. Room.messages.upsert()
-  **/
-  static setupScopes(ctx: any): void {
+  * setup writting events for root models
+   */
+  static setupScopeWritings(ctx: any, event: string): void {
     if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations) return;
     Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach((scope: string) => {
       let relation: any = FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations[scope];
       // Lets copy the context for each Scope, to keep the right references
       let _ctx = Object.assign({}, { modelName: `${ctx.modelName}.${scope}` }, ctx);
-      FireLoop.events.modify.forEach((event: string) => {
-        RealTimeLog.log(`FireLoop setting relation: ${ctx.modelName}.${scope}.${event}`);
-        _ctx.modelName = `${ctx.modelName}.${scope}`;
-        ctx.socket.on(
-          `${_ctx.modelName}.${event}`,
-          (input: FireLoopData) => {
-            RealTimeLog.log(`FireLoop relation operation: ${_ctx.modelName}.${event}: ${JSON.stringify(input)}`);
-            (<any>FireLoop)[event](_ctx, input);
+      _ctx.modelName = `${ctx.modelName}.${scope}`;
+      // Setup writting events for scope/related models
+      RealTimeLog.log(`FireLoop setting write relation: ${ctx.modelName}.${scope}.${event}.${ctx.subscription.id}`);
+      ctx.socket.on(
+        `${_ctx.modelName}.${event}.${ctx.subscription.id}`,
+        (input: FireLoopData) => {
+          _ctx.input = input;
+          RealTimeLog.log(`FireLoop relation operation: ${_ctx.modelName}.${event}.${ctx.subscription.id}: ${JSON.stringify(input)}`);
+          (<any>FireLoop)[event](_ctx, input);
+        }
+      )
+    });
+  }
+  /**
+  * @method setupScopeReading
+  * @description
+  * Listen for connections that requests to pull data without waiting until the next
+  * public broadcast announce.
+  **/
+  static setupScopeReadings(ctx: any, event: string): void {
+    if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations) return;
+    Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach((scope: string) => {
+      let relation: any = FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations[scope];
+      // Lets copy the context for each Scope, to keep the right references
+      // TODO: Make sure _ctx is deleted when client is out, not seeing where it is removed (JC)
+      let _ctx = Object.assign({}, { modelName: `${ctx.modelName}.${scope}` }, ctx);
+      _ctx.modelName = `${ctx.modelName}.${scope}`;
+      RealTimeLog.log(`FireLoop setting read relation: ${_ctx.modelName}.${event}.pull.request.${ctx.subscription.id}`);
+      ctx.socket.on(
+        `${_ctx.modelName}.${event}.pull.request.${ctx.subscription.id}`,
+        (request: any) => {
+          _ctx.input = request; // Needs to be inside because we need scope params from request
+          FireLoop.setupBroadcast(_ctx, event);
+          let _filter: any = Object.assign({}, request.filter);
+          RealTimeLog.log(`FireLoop scope pull request received: ${JSON.stringify(_filter)}`);
+          let emit: any = (err: any, data: any) => {
+            if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
+            ctx.socket.emit(`${_ctx.modelName}.${event}.pull.requested.${ctx.subscription.id}`, err ? { error: err } : data);
+          };
+          // TODO: Verify if this works with child references?
+          switch (event) {
+            case 'value':
+            case 'change':
+              FireLoop.getReference(_ctx.modelName, request, (ref: any) => ref(_filter, emit));
+              break;
+            case 'stats':
+              RealTimeLog.log('Stats are currently only for root models');
+              // ctx.Model.stats(_filter.range ||  'monthly', _filter.custom, _filter.where ||  {}, _filter.groupBy, emit);
+              break;
           }
-        )
-      });
+        }
+      );
     });
   }
   /**
@@ -165,7 +221,10 @@ export class FireLoop {
       let segments: string[] = modelName.split('.');
       let parent: any = FireLoop.options.app.models[segments[0]] || null;
       if (!parent) return null;
-      return parent.findOne({ where: input.parent }, (err: any, instance: any) => {
+      let idName: any = parent.getIdName();
+      let filter: any = { where: {} };
+      filter.where[idName] = input.parent[idName];
+      return parent.findOne(filter, (err: any, instance: any) => {
         ref = instance[segments[1]] || null;
         next(ref);
       });
@@ -199,34 +258,7 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
-      (ref: any, next: Function) => {
-        if (ref.checkAccess) {
-          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: 'create',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: 'create',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else{
-          RealTimeLog.log(ref);
-          next(FireLoop.UNAUTHORIZED, ref);
-        }
-      },
+      (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
       (ref: any, next: Function) => ref.create(input.data, next)
     ], (err: any, data: any) => FireLoop.publish(
       Object.assign({ err, input, data, created: true }, ctx))
@@ -259,34 +291,7 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
-      (ref: any, next: Function) => {
-        if (ref.checkAccess) {
-          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: 'create',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: 'create',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else{
-          RealTimeLog.log(ref);
-          next(FireLoop.UNAUTHORIZED, ref);
-        }
-      },
+      (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
       (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst)),
       (ref: any, inst: any, next: Function) => {
         if (inst) {
@@ -327,34 +332,7 @@ export class FireLoop {
           next(null, ctx.Model);
         }
       },
-      (ref: any, next: Function) => {
-        if (ref.checkAccess) {
-          ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: ref.destroy ? 'destroy' : 'removeById',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else if(input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-          FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-            name: ref.destroy ? 'destroy' : 'removeById',
-            aliases: []
-          }, {}, function (err: any, access: boolean) {
-            if (access) {
-              next(null, ref);
-            } else {
-              next(FireLoop.UNAUTHORIZED, ref);
-            }
-          });
-        } else{
-          RealTimeLog.log(ref);
-          next(FireLoop.UNAUTHORIZED, ref);
-        }
-      },
+      (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, ref.destroy ? 'destroy' : 'removeById', input, next),
       (ref: any, next: Function) => ref.destroy
         ? ref.destroy(input.data.id, next)
         : ref.removeById(input.data.id, next)
@@ -374,23 +352,23 @@ export class FireLoop {
   static publish(ctx: any): void {
     // Response to the client that sent the request
     ctx.socket.emit(
-      `${ctx.modelName}.value.result.${ctx.input.id}`,
+      `${ctx.modelName}.value.result.${ctx.subscription.id}`,
       ctx.err ? { error: ctx.err } : ctx.data || ctx.removed
     );
     if (ctx.err) { return; }
     if (ctx.data) {
-      FireLoop.broadcast('value', ctx);
+      FireLoop.broadcast(ctx, 'value');
       if (ctx.created) {
-        FireLoop.broadcast('child_added', ctx);
+        FireLoop.broadcast(ctx, 'child_added');
       } else {
-        FireLoop.broadcast('child_changed', ctx);
+        FireLoop.broadcast(ctx, 'child_changed');
       }
     } else if (ctx.removed) {
-      FireLoop.broadcast('child_removed', ctx);
+      FireLoop.broadcast(ctx, 'child_removed');
     }
     // In any of the operations we call the changesevent
-    FireLoop.broadcast('change', ctx);
-    FireLoop.broadcast('stats', ctx);
+    FireLoop.broadcast(ctx, 'change');
+    FireLoop.broadcast(ctx, 'stats');
   }
   /**
   * @method broadcast
@@ -401,13 +379,25 @@ export class FireLoop {
   * Context will be destroyed everytime, make sure the ctx passed is a
   * custom copy for current request or else bad things will happen :P.
   * WARNING: Do not pass the root context.
+  *
+  * There are 2 different type context used in this method
+  * 1.- ctx = user executing an operation (The trigger)
+  * 2.- context = each of all users subscribed to specific operations
   **/
-  static broadcast(event: string, ctx: any): void {
+  static broadcast(ctx: any, event: string): void {
     RealTimeLog.log(`FireLoop ${event} broadcasting`);
-    if (event.match(/(child_changed|child_removed)/)) {
-      FireLoop.driver.emit(`${ctx.modelName}.${event}.broadcast`, ctx.data || ctx.removed);
-    }
-    FireLoop.driver.emit(`${ctx.modelName}.${event}.broadcast.announce`, 1);
+    Object.keys(FireLoop.contexts).forEach((connContextId: number) => {
+      Object.keys(FireLoop.contexts[connContextId]).forEach((contextId: number) => {
+        let context: any = FireLoop.contexts[connContextId][contextId];
+        let scopeModelName: string = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
+        if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp(`\\b${scopeModelName}\.${context.subscription.relationship}\\b`,'g'))) {
+          if (event.match(/(child_changed|child_removed)/)) {
+            context.socket.emit(`${ctx.modelName}.${event}.broadcast.${context.subscription.id}`, ctx.data || ctx.removed);
+          }
+          context.socket.emit(`${ctx.modelName}.${event}.broadcast.announce.${context.subscription.id}`, 1);
+        }
+      });
+    });
     ctx = null;
   }
   /**
@@ -418,24 +408,22 @@ export class FireLoop {
   * Anyway, this setup needs to be done once and prior any broadcast, so it is
   * configured when the connection is made, before any broadcast announce.
   **/
-  static setupBroadcast(event: string, ctx: any): void {
+  static setupBroadcast(ctx: any, event: string): void {
     if (!event.match(/(value|change|stats|child_added)/)) { return; }
-    RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request`);
-    ctx.socket.on(`${ctx.modelName}.${event}.broadcast.request`, (filter: any) => {
-      
-      let _filter: any = Object.assign({}, filter);
-      RealTimeLog.log(`FireLoop ${event} broadcast request received: ${JSON.stringify(_filter)}`);
-
+    RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request.${ctx.subscription.id}`);
+    ctx.socket.on(`${ctx.modelName}.${event}.broadcast.request.${ctx.subscription.id}`, (request: any) => {
+      let _request: any = Object.assign({}, request);
+      RealTimeLog.log(`FireLoop ${event} broadcast request received: ${JSON.stringify(_request.filter)}`);
       // Standard Broadcast Function (Will be used in any of the cases).
       let broadcast: Function = (err: any, data: any) => {
         if (err) RealTimeLog.log(`FireLoop server error: ${JSON.stringify(err)}`);
         if (event.match(/(value|change|stats)/)) {
           RealTimeLog.log(`FireLoop ${event} broadcasting: ${JSON.stringify(data)}`);
-          ctx.socket.emit(`${ctx.modelName}.${event}.broadcast`, err ? { error: err } : data);
+          ctx.socket.emit(`${ctx.modelName}.${event}.broadcast.${ctx.subscription.id}`, err ? { error: err } : data);
         } else {
           data.forEach(
             (d: any) => ctx.socket.emit(
-              `${ctx.modelName}.${event}.broadcast`,
+              `${ctx.modelName}.${event}.broadcast.${ctx.subscription.id}`,
               err ? { error: err } : d
             )
           );
@@ -443,11 +431,11 @@ export class FireLoop {
       };
 
       // Define the name of the method
-      let remoteMethod: { name: string, aliases: string[] } = { name: '', aliases: [] };
-      if (event === 'stats') {
-        remoteMethod.name = 'stats';
+      let remoteEvent: string;
+      if (remoteEvent === 'stats') {
+        remoteEvent = 'stats';
       } else {
-        remoteMethod.name = 'find';
+        remoteEvent = 'find';
       }
 
       // Progress of fetching and broadcasting the data
@@ -461,30 +449,83 @@ export class FireLoop {
           }
         },
         // Check for Access
-        (ref: any, next: Function) => {
-          ref.checkAccess(ctx.socket.token, null, remoteMethod, {}, (err: any, hasAccess: boolean) => next(err, hasAccess, ref));
-        },
+        (ref: any, next: Function) => FireLoop.checkAccess(
+          ctx,
+          ref,
+          remoteEvent,
+          ctx.input,
+          (err: Error, hasAccess: boolean) => next(err, hasAccess, ref)
+        ),
         // Make the right call if accessed
         (hasAccess: boolean, ref: any, next: Function) => {
           if (!hasAccess) {
             broadcast(FireLoop.UNAUTHORIZED);
             next();
           } else {
-            switch(remoteMethod.name) {
+            switch (remoteEvent) {
               case 'find':
                 if (ctx.modelName.match(/\./g)) {
-                  ref(_filter, broadcast);
+                  ref(_request.filter, broadcast);
                 } else {
-                  ref.find(_filter, broadcast);
+                  ref.find(_request.filter, broadcast);
                 }
-              break;
+                break;
               case 'stats':
-                ref.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, broadcast);
-              break;
+                ref.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, broadcast);
+                break;
             }
           }
         }
       ]);
     });
+  }
+  /**
+  * @method checkAccess
+  * @param ctx (current client context)
+  * @param ref (model reference)
+  * @param event (event to be executed)
+  * @param input (input request from client)
+  * @param next callback function
+  * @description
+  * This will verify if the current client has access to specific remotes.
+  **/
+  static checkAccess(ctx: any, ref: any, event: string, input: any, next: Function) {
+    if (ref.checkAccess) {
+      ref.checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
+        name: event, aliases: [] }, {}, function (err: any, access: boolean) {
+        if (access) {
+          next(null, ref);
+        } else {
+          next(FireLoop.UNAUTHORIZED, ref);
+        }
+      });
+    } else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
+      FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
+        name: event, aliases: [] }, {}, function (err: any, access: boolean) {
+        if (access) {
+          next(null, ref);
+        } else {
+          next(FireLoop.UNAUTHORIZED, ref);
+        }
+      });
+    } else {
+      RealTimeLog.log(`Reference not found for: ${ ctx.subscription.scope }`);
+      next(FireLoop.UNAUTHORIZED, ref);
+    }
+  }
+  /**
+  * @method buildId
+  * @description
+  * This will create unique numeric ids for each conenction context.
+  **/
+  static buildId(): number {
+    let id: number = Date.now() + Math.floor(Math.random() * 100800) *
+      Math.floor(Math.random() * 100700) *
+      Math.floor(Math.random() * 198500);
+    if (FireLoop.contexts[id]) {
+      return FireLoop.buildId();
+    } else {
+      return id;
+    }
   }
 }

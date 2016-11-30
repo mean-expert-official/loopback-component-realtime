@@ -18,4 +18,4 @@ var RealTimeLog = (function () {
     return RealTimeLog;
 }());
 exports.RealTimeLog = RealTimeLog;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/logger.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/logger.js.map

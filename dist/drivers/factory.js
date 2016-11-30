@@ -22,4 +22,4 @@ var DriverFactory = (function () {
     return DriverFactory;
 }());
 exports.DriverFactory = DriverFactory;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/drivers/factory.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/drivers/factory.js.map

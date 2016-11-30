@@ -61,4 +61,4 @@ var WebRTCSignaler = (function () {
     return WebRTCSignaler;
 }());
 exports.WebRTCSignaler = WebRTCSignaler;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/modules/WebRTCSignaler.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/WebRTCSignaler.js.map

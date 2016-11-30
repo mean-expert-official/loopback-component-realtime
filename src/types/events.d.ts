@@ -5,4 +5,4 @@
  * 
  * This interface defines the contract for events that will be used by FireLoop
  */
-export interface EventsInterface { read: string[], modify: string[] }
+export interface EventsInterface { readings: string[], writings: string[] }

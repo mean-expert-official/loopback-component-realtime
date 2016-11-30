@@ -25,4 +25,4 @@ var IO = (function () {
     return IO;
 }());
 exports.IO = IO;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/modules/IO.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/IO.js.map

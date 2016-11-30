@@ -71,7 +71,7 @@ app.start = function() {
 
 
 # PRESENTING FIRELOOP.IO (NEW)
-[![FireLoop.io](https://storage.googleapis.com/mean-expert-images/fireloop-logo.png)](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/8.-(NEW)-FireLoop-API)
+[![FireLoop.io](https://storage.googleapis.com/mean-expert-images/fireloop-logo.png)](https://github.com/mean-expert-official/fireloop.io/wiki)
 
 # Generate FireLoop Angular 2 Client
 FireLoop Client for Angular 2 Applications are built in when generating your LoopBack SDK. Read the [Following Instructions](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/1.-Install-Builder-&-Build-SDK) in order to automatically generate your software development kit.

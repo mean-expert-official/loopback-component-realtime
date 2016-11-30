@@ -148,4 +148,4 @@ var PubSubMixin = (function () {
     return PubSubMixin;
 }());
 module.exports = PubSubMixin;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/mixins/pub-sub.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/mixins/pub-sub.js.map

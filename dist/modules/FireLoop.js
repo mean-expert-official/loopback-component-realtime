@@ -34,85 +34,132 @@ var FireLoop = (function () {
     FireLoop.setup = function () {
         // Setup Each Connection
         FireLoop.driver.onConnection(function (socket) {
+            socket.connContextId = FireLoop.buildId();
+            FireLoop.contexts[socket.connContextId] = {};
             // Setup On Set Methods
             Object.keys(FireLoop.options.app.models).forEach(function (modelName) {
                 return FireLoop.getReference(modelName, null, function (Model) {
-                    var ctx = { modelName: modelName, Model: Model, socket: socket };
-                    FireLoop.events.modify.forEach(function (event) {
-                        return ctx.socket.on(ctx.modelName + "." + event, function (input) { return FireLoop[event](ctx, input); });
+                    // Setup reference subscriptions
+                    socket.on("Subscribe." + modelName, function (subscription) {
+                        FireLoop.contexts[socket.connContextId][subscription.id] = {
+                            modelName: modelName, Model: Model, socket: socket, subscription: subscription
+                        };
+                        // Iterate for writting events
+                        FireLoop.events.writings.forEach(function (event) {
+                            FireLoop.setupModelWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+                            FireLoop.setupScopeWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+                        });
+                        // Iterate for reading events
+                        FireLoop.events.readings.forEach(function (event) {
+                            FireLoop.setupModelReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+                            FireLoop.setupScopeReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
+                        });
                     });
-                    // Setup Relations
-                    FireLoop.setupScopes(ctx);
-                    // Setup Pull Requests
-                    FireLoop.setupPullRequests(ctx);
-                    // Setup Relation Request
-                    FireLoop.setupRelationRequest(ctx);
                 });
+            });
+            // Clean client contexts from the server memory when client disconnects :D
+            socket.on('disconnect', function () {
+                logger_1.RealTimeLog.log("FireLoop is releasing context three with id " + socket.connContextId + " from memory");
+                delete FireLoop.contexts[socket.connContextId];
             });
         });
     };
     /**
-    * @method setupRelationRequest
+    * @method setupModelWritings
     * @description
-    * Listen for connections that requests relation data.
-    **/
-    FireLoop.setupRelationRequest = function (ctx) {
-        ctx.socket.on(ctx.modelName + ".relation.request", function (input) {
-            var model = ctx.Model.relations[input.relation].modelTo.sharedClass.name;
-            ctx.socket.emit(ctx.modelName + ".relation.request.result", { name: model });
-        });
+    * setup writting events for root models
+     */
+    FireLoop.setupModelWritings = function (ctx, event) {
+        ctx.socket.on(ctx.modelName + "." + event + "." + ctx.subscription.id, function (input) { return FireLoop[event](ctx, input); });
     };
     /**
-    * @method setupPullRequest
+    * @method setupModelReading
     * @description
     * Listen for connections that requests to pull data without waiting until the next
     * public broadcast announce.
     **/
-    FireLoop.setupPullRequests = function (ctx) {
-        // Configure Pull Request for read type of Events
-        FireLoop.events.read.forEach(function (event) {
-            ctx.socket.on(ctx.modelName + "." + event + ".pull.request", function (filter) {
-                var _filter = Object.assign({}, filter);
-                logger_1.RealTimeLog.log("FireLoop broadcast request received: " + JSON.stringify(_filter));
-                var emit = function (err, data) {
-                    if (err)
-                        logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
-                    ctx.socket.emit(ctx.modelName + "." + event + ".pull.requested", err ? { error: err } : data);
-                };
-                // TODO: Verify if this works with child references?
-                switch (event) {
-                    case 'value':
-                    case 'change':
-                        ctx.Model.find(_filter, emit);
-                        break;
-                    case 'stats':
-                        ctx.Model.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, emit);
-                        break;
-                }
-            });
-            FireLoop.setupBroadcast(event, ctx);
+    FireLoop.setupModelReadings = function (ctx, event) {
+        // Pull Request Listener
+        ctx.socket.on(ctx.modelName + "." + event + ".pull.request." + ctx.subscription.id, function (request) {
+            var _request = Object.assign({}, request);
+            logger_1.RealTimeLog.log("FireLoop model pull request received: " + JSON.stringify(_request.filter));
+            var emit = function (err, data) {
+                if (err)
+                    logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
+                ctx.socket.emit(ctx.modelName + "." + event + ".pull.requested." + ctx.subscription.id, err ? { error: err } : data);
+            };
+            // This works only for Root Models, related models are configured in setupScopes method
+            switch (event) {
+                case 'value':
+                case 'change':
+                    ctx.Model.find(_request.filter, emit);
+                    break;
+                case 'stats':
+                    ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
+                    break;
+            }
         });
+        FireLoop.setupBroadcast(ctx, event);
     };
     /**
-    * @method setupScopes
+    * @method setupScopeWritings
     * @description
-    * Listen for connections working with child references, in LoopBack these are called scopes
-    * Basically is setting up the methods for a related method. e.g. Room.messages.upsert()
-    **/
-    FireLoop.setupScopes = function (ctx) {
+    * setup writting events for root models
+     */
+    FireLoop.setupScopeWritings = function (ctx, event) {
         if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations)
             return;
         Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach(function (scope) {
             var relation = FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations[scope];
             // Lets copy the context for each Scope, to keep the right references
             var _ctx = Object.assign({}, { modelName: ctx.modelName + "." + scope }, ctx);
-            FireLoop.events.modify.forEach(function (event) {
-                logger_1.RealTimeLog.log("FireLoop setting relation: " + ctx.modelName + "." + scope + "." + event);
-                _ctx.modelName = ctx.modelName + "." + scope;
-                ctx.socket.on(_ctx.modelName + "." + event, function (input) {
-                    logger_1.RealTimeLog.log("FireLoop relation operation: " + _ctx.modelName + "." + event + ": " + JSON.stringify(input));
-                    FireLoop[event](_ctx, input);
-                });
+            _ctx.modelName = ctx.modelName + "." + scope;
+            // Setup writting events for scope/related models
+            logger_1.RealTimeLog.log("FireLoop setting write relation: " + ctx.modelName + "." + scope + "." + event + "." + ctx.subscription.id);
+            ctx.socket.on(_ctx.modelName + "." + event + "." + ctx.subscription.id, function (input) {
+                _ctx.input = input;
+                logger_1.RealTimeLog.log("FireLoop relation operation: " + _ctx.modelName + "." + event + "." + ctx.subscription.id + ": " + JSON.stringify(input));
+                FireLoop[event](_ctx, input);
+            });
+        });
+    };
+    /**
+    * @method setupScopeReading
+    * @description
+    * Listen for connections that requests to pull data without waiting until the next
+    * public broadcast announce.
+    **/
+    FireLoop.setupScopeReadings = function (ctx, event) {
+        if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations)
+            return;
+        Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach(function (scope) {
+            var relation = FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations[scope];
+            // Lets copy the context for each Scope, to keep the right references
+            // TODO: Make sure _ctx is deleted when client is out, not seeing where it is removed (JC)
+            var _ctx = Object.assign({}, { modelName: ctx.modelName + "." + scope }, ctx);
+            _ctx.modelName = ctx.modelName + "." + scope;
+            logger_1.RealTimeLog.log("FireLoop setting read relation: " + _ctx.modelName + "." + event + ".pull.request." + ctx.subscription.id);
+            ctx.socket.on(_ctx.modelName + "." + event + ".pull.request." + ctx.subscription.id, function (request) {
+                _ctx.input = request; // Needs to be inside because we need scope params from request
+                FireLoop.setupBroadcast(_ctx, event);
+                var _filter = Object.assign({}, request.filter);
+                logger_1.RealTimeLog.log("FireLoop scope pull request received: " + JSON.stringify(_filter));
+                var emit = function (err, data) {
+                    if (err)
+                        logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
+                    ctx.socket.emit(_ctx.modelName + "." + event + ".pull.requested." + ctx.subscription.id, err ? { error: err } : data);
+                };
+                // TODO: Verify if this works with child references?
+                switch (event) {
+                    case 'value':
+                    case 'change':
+                        FireLoop.getReference(_ctx.modelName, request, function (ref) { return ref(_filter, emit); });
+                        break;
+                    case 'stats':
+                        logger_1.RealTimeLog.log('Stats are currently only for root models');
+                        // ctx.Model.stats(_filter.range ||  'monthly', _filter.custom, _filter.where ||  {}, _filter.groupBy, emit);
+                        break;
+                }
             });
         });
     };
@@ -132,7 +179,10 @@ var FireLoop = (function () {
             var parent_1 = FireLoop.options.app.models[segments_1[0]] || null;
             if (!parent_1)
                 return null;
-            return parent_1.findOne({ where: input.parent }, function (err, instance) {
+            var idName = parent_1.getIdName();
+            var filter = { where: {} };
+            filter.where[idName] = input.parent[idName];
+            return parent_1.findOne(filter, function (err, instance) {
                 ref = instance[segments_1[1]] || null;
                 next(ref);
             });
@@ -169,38 +219,7 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
-            function (ref, next) {
-                if (ref.checkAccess) {
-                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: 'create',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: 'create',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else {
-                    logger_1.RealTimeLog.log(ref);
-                    next(FireLoop.UNAUTHORIZED, ref);
-                }
-            },
+            function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) { return ref.create(input.data, next); }
         ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx)); });
     };
@@ -233,38 +252,7 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
-            function (ref, next) {
-                if (ref.checkAccess) {
-                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: 'create',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: 'create',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else {
-                    logger_1.RealTimeLog.log(ref);
-                    next(FireLoop.UNAUTHORIZED, ref);
-                }
-            },
+            function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) { return ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); }); },
             function (ref, inst, next) {
                 if (inst) {
@@ -306,38 +294,7 @@ var FireLoop = (function () {
                     next(null, ctx.Model);
                 }
             },
-            function (ref, next) {
-                if (ref.checkAccess) {
-                    ref.checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: ref.destroy ? 'destroy' : 'removeById',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else if (input.current && FireLoop.options.app.models[input.current.name].checkAccess) {
-                    FireLoop.options.app.models[input.current.name].checkAccess(ctx.socket.token, input.parent ? input.parent.id : null, {
-                        name: ref.destroy ? 'destroy' : 'removeById',
-                        aliases: []
-                    }, {}, function (err, access) {
-                        if (access) {
-                            next(null, ref);
-                        }
-                        else {
-                            next(FireLoop.UNAUTHORIZED, ref);
-                        }
-                    });
-                }
-                else {
-                    logger_1.RealTimeLog.log(ref);
-                    next(FireLoop.UNAUTHORIZED, ref);
-                }
-            },
+            function (ref, next) { return FireLoop.checkAccess(ctx, ref, ref.destroy ? 'destroy' : 'removeById', input, next); },
             function (ref, next) { return ref.destroy
                 ? ref.destroy(input.data.id, next)
                 : ref.removeById(input.data.id, next); }
@@ -354,25 +311,25 @@ var FireLoop = (function () {
     **/
     FireLoop.publish = function (ctx) {
         // Response to the client that sent the request
-        ctx.socket.emit(ctx.modelName + ".value.result." + ctx.input.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
+        ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
         if (ctx.err) {
             return;
         }
         if (ctx.data) {
-            FireLoop.broadcast('value', ctx);
+            FireLoop.broadcast(ctx, 'value');
             if (ctx.created) {
-                FireLoop.broadcast('child_added', ctx);
+                FireLoop.broadcast(ctx, 'child_added');
             }
             else {
-                FireLoop.broadcast('child_changed', ctx);
+                FireLoop.broadcast(ctx, 'child_changed');
             }
         }
         else if (ctx.removed) {
-            FireLoop.broadcast('child_removed', ctx);
+            FireLoop.broadcast(ctx, 'child_removed');
         }
         // In any of the operations we call the changesevent
-        FireLoop.broadcast('change', ctx);
-        FireLoop.broadcast('stats', ctx);
+        FireLoop.broadcast(ctx, 'change');
+        FireLoop.broadcast(ctx, 'stats');
     };
     /**
     * @method broadcast
@@ -383,13 +340,25 @@ var FireLoop = (function () {
     * Context will be destroyed everytime, make sure the ctx passed is a
     * custom copy for current request or else bad things will happen :P.
     * WARNING: Do not pass the root context.
+    *
+    * There are 2 different type context used in this method
+    * 1.- ctx = user executing an operation (The trigger)
+    * 2.- context = each of all users subscribed to specific operations
     **/
-    FireLoop.broadcast = function (event, ctx) {
+    FireLoop.broadcast = function (ctx, event) {
         logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting");
-        if (event.match(/(child_changed|child_removed)/)) {
-            FireLoop.driver.emit(ctx.modelName + "." + event + ".broadcast", ctx.data || ctx.removed);
-        }
-        FireLoop.driver.emit(ctx.modelName + "." + event + ".broadcast.announce", 1);
+        Object.keys(FireLoop.contexts).forEach(function (connContextId) {
+            Object.keys(FireLoop.contexts[connContextId]).forEach(function (contextId) {
+                var context = FireLoop.contexts[connContextId][contextId];
+                var scopeModelName = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
+                if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp("\\b" + scopeModelName + "." + context.subscription.relationship + "\\b", 'g'))) {
+                    if (event.match(/(child_changed|child_removed)/)) {
+                        context.socket.emit(ctx.modelName + "." + event + ".broadcast." + context.subscription.id, ctx.data || ctx.removed);
+                    }
+                    context.socket.emit(ctx.modelName + "." + event + ".broadcast.announce." + context.subscription.id, 1);
+                }
+            });
+        });
         ctx = null;
     };
     /**
@@ -400,33 +369,33 @@ var FireLoop = (function () {
     * Anyway, this setup needs to be done once and prior any broadcast, so it is
     * configured when the connection is made, before any broadcast announce.
     **/
-    FireLoop.setupBroadcast = function (event, ctx) {
+    FireLoop.setupBroadcast = function (ctx, event) {
         if (!event.match(/(value|change|stats|child_added)/)) {
             return;
         }
-        logger_1.RealTimeLog.log("FireLoop setting up: " + ctx.modelName + "." + event + ".broadcast.request");
-        ctx.socket.on(ctx.modelName + "." + event + ".broadcast.request", function (filter) {
-            var _filter = Object.assign({}, filter);
-            logger_1.RealTimeLog.log("FireLoop " + event + " broadcast request received: " + JSON.stringify(_filter));
+        logger_1.RealTimeLog.log("FireLoop setting up: " + ctx.modelName + "." + event + ".broadcast.request." + ctx.subscription.id);
+        ctx.socket.on(ctx.modelName + "." + event + ".broadcast.request." + ctx.subscription.id, function (request) {
+            var _request = Object.assign({}, request);
+            logger_1.RealTimeLog.log("FireLoop " + event + " broadcast request received: " + JSON.stringify(_request.filter));
             // Standard Broadcast Function (Will be used in any of the cases).
             var broadcast = function (err, data) {
                 if (err)
                     logger_1.RealTimeLog.log("FireLoop server error: " + JSON.stringify(err));
                 if (event.match(/(value|change|stats)/)) {
                     logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting: " + JSON.stringify(data));
-                    ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : data);
+                    ctx.socket.emit(ctx.modelName + "." + event + ".broadcast." + ctx.subscription.id, err ? { error: err } : data);
                 }
                 else {
-                    data.forEach(function (d) { return ctx.socket.emit(ctx.modelName + "." + event + ".broadcast", err ? { error: err } : d); });
+                    data.forEach(function (d) { return ctx.socket.emit(ctx.modelName + "." + event + ".broadcast." + ctx.subscription.id, err ? { error: err } : d); });
                 }
             };
             // Define the name of the method
-            var remoteMethod = { name: '', aliases: [] };
-            if (event === 'stats') {
-                remoteMethod.name = 'stats';
+            var remoteEvent;
+            if (remoteEvent === 'stats') {
+                remoteEvent = 'stats';
             }
             else {
-                remoteMethod.name = 'find';
+                remoteEvent = 'find';
             }
             // Progress of fetching and broadcasting the data
             async.waterfall([
@@ -440,9 +409,7 @@ var FireLoop = (function () {
                     }
                 },
                 // Check for Access
-                function (ref, next) {
-                    ref.checkAccess(ctx.socket.token, null, remoteMethod, {}, function (err, hasAccess) { return next(err, hasAccess, ref); });
-                },
+                function (ref, next) { return FireLoop.checkAccess(ctx, ref, remoteEvent, ctx.input, function (err, hasAccess) { return next(err, hasAccess, ref); }); },
                 // Make the right call if accessed
                 function (hasAccess, ref, next) {
                     if (!hasAccess) {
@@ -450,23 +417,77 @@ var FireLoop = (function () {
                         next();
                     }
                     else {
-                        switch (remoteMethod.name) {
+                        switch (remoteEvent) {
                             case 'find':
                                 if (ctx.modelName.match(/\./g)) {
-                                    ref(_filter, broadcast);
+                                    ref(_request.filter, broadcast);
                                 }
                                 else {
-                                    ref.find(_filter, broadcast);
+                                    ref.find(_request.filter, broadcast);
                                 }
                                 break;
                             case 'stats':
-                                ref.stats(_filter.range || 'monthly', _filter.custom, _filter.where || {}, _filter.groupBy, broadcast);
+                                ref.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, broadcast);
                                 break;
                         }
                     }
                 }
             ]);
         });
+    };
+    /**
+    * @method checkAccess
+    * @param ctx (current client context)
+    * @param ref (model reference)
+    * @param event (event to be executed)
+    * @param input (input request from client)
+    * @param next callback function
+    * @description
+    * This will verify if the current client has access to specific remotes.
+    **/
+    FireLoop.checkAccess = function (ctx, ref, event, input, next) {
+        if (ref.checkAccess) {
+            ref.checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
+                name: event, aliases: [] }, {}, function (err, access) {
+                if (access) {
+                    next(null, ref);
+                }
+                else {
+                    next(FireLoop.UNAUTHORIZED, ref);
+                }
+            });
+        }
+        else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
+            FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
+                name: event, aliases: [] }, {}, function (err, access) {
+                if (access) {
+                    next(null, ref);
+                }
+                else {
+                    next(FireLoop.UNAUTHORIZED, ref);
+                }
+            });
+        }
+        else {
+            logger_1.RealTimeLog.log("Reference not found for: " + ctx.subscription.scope);
+            next(FireLoop.UNAUTHORIZED, ref);
+        }
+    };
+    /**
+    * @method buildId
+    * @description
+    * This will create unique numeric ids for each conenction context.
+    **/
+    FireLoop.buildId = function () {
+        var id = Date.now() + Math.floor(Math.random() * 100800) *
+            Math.floor(Math.random() * 100700) *
+            Math.floor(Math.random() * 198500);
+        if (FireLoop.contexts[id]) {
+            return FireLoop.buildId();
+        }
+        else {
+            return id;
+        }
     };
     /**
      * @property UNAUTHORIZED: string
@@ -478,10 +499,16 @@ var FireLoop = (function () {
      * The options object that are injected from the main module
      **/
     FireLoop.events = {
-        read: ['value', 'change', 'stats'],
-        modify: ['create', 'upsert', 'remove'],
+        readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
+        writings: ['create', 'upsert', 'remove'],
     };
+    /**
+     * @property context {[ id: number ]: {[ id: number ]: Object }}
+     * Context container, it will temporally store contexts. These
+     * are automatically deleted when client disconnects.
+     **/
+    FireLoop.contexts = {};
     return FireLoop;
 }());
 exports.FireLoop = FireLoop;
-//# sourceMappingURL=/Users/developer/Documents/Training/NativeScript/native-chat-ultimate/realtime/loopback-component-realtime/src/modules/FireLoop.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/FireLoop.js.map

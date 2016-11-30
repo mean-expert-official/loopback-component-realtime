@@ -1,6 +1,6 @@
 {
   "name": "@mean-expert/loopback-component-realtime",
-  "version": "1.0.0-beta.9",
+  "version": "1.0.0-rc.1",
   "description": "The LoopBack Component that turns this great framework into a powerful real-time platform",
   "main": "index.js",
   "scripts": {
@@ -14,6 +14,14 @@
     "LoopBack SDK Builder",
     "LoopBack Component Real-Time",
     "FireLoop"
+  ],
+  "files": [
+    "index.js",
+    "package.json",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "dist"
   ],
   "author": {
     "name": "Jonathan Casarrubias",
