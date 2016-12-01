@@ -391,7 +391,7 @@ var FireLoop = (function () {
             };
             // Define the name of the method
             var remoteEvent;
-            if (remoteEvent === 'stats') {
+            if (event.match('stats')) {
                 remoteEvent = 'stats';
             }
             else {

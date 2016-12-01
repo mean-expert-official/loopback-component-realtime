@@ -432,7 +432,7 @@ export class FireLoop {
 
       // Define the name of the method
       let remoteEvent: string;
-      if (remoteEvent === 'stats') {
+      if (event.match('stats')) {
         remoteEvent = 'stats';
       } else {
         remoteEvent = 'find';

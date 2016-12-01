@@ -1,5 +1,13 @@
 
 
+### version 1.0.0-rc.2
+
+- Hot Fix Stats Event
+
+### version 1.0.0-rc.1
+
+- Final FireLoop Implementation
+
 ### version 1.0.0-beta.8
 
 - Fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/22
