@@ -44,6 +44,10 @@ var FireLoop = (function () {
                         FireLoop.contexts[socket.connContextId][subscription.id] = {
                             modelName: modelName, Model: Model, socket: socket, subscription: subscription
                         };
+                        // Register remote method events
+                        FireLoop.setupRemoteMethods(FireLoop.contexts[socket.connContextId][subscription.id]);
+                        // Register dispose method to removeAllListeners
+                        FireLoop.setupDisposeReference(FireLoop.contexts[socket.connContextId][subscription.id]);
                         // Iterate for writting events
                         FireLoop.events.writings.forEach(function (event) {
                             FireLoop.setupModelWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
@@ -63,6 +67,22 @@ var FireLoop = (function () {
                 delete FireLoop.contexts[socket.connContextId];
             });
         });
+    };
+    /**
+    * @method setupDisposeReference
+    * @description
+    * will remove all the listeners for this reference subscription
+     */
+    FireLoop.setupDisposeReference = function (ctx) {
+        ctx.socket.on(ctx.modelName + ".dispose." + ctx.subscription.id, function (input) { return ctx.socket.removeAllListeners(ctx.modelName + ".remote." + ctx.subscription.id); });
+    };
+    /**
+    * @method setupRemoteMethods
+    * @description
+    * setup writting events for root models
+     */
+    FireLoop.setupRemoteMethods = function (ctx) {
+        ctx.socket.on(ctx.modelName + ".remote." + ctx.subscription.id, function (input) { return FireLoop.remote(ctx, input); });
     };
     /**
     * @method setupModelWritings
@@ -193,6 +213,45 @@ var FireLoop = (function () {
         next(ref);
     };
     /**
+    * @method remote
+    * @description
+    * Enables an interface for calling remote methods from FireLoop clients.
+    **/
+    FireLoop.remote = function (ctx, input) {
+        logger_1.RealTimeLog.log("FireLoop starting remote: " + ctx.modelName + ": " + JSON.stringify(input));
+        async.waterfall([
+            function (next) {
+                if (ctx.modelName.match(/\./g)) {
+                    FireLoop.getReference(ctx.modelName, input, function (ref) {
+                        if (!ref) {
+                            next({ error: ctx.modelName + " Model reference was not found." });
+                        }
+                        else {
+                            next(null, ref);
+                        }
+                    });
+                }
+                else {
+                    next(null, ctx.Model);
+                }
+            },
+            function (ref, next) { return FireLoop.checkAccess(ctx, ref, input.data.method, input, next); },
+            function (ref, next) {
+                var method = ref[input.data.method];
+                if (!method) {
+                    return next("ERROR: Remote method " + input.data.method + " was not found");
+                }
+                if (Array.isArray(input.data.params) && input.data.params.length > 0) {
+                    input.data.params.push(next);
+                    method.apply(method, input.data.params);
+                }
+                else {
+                    method(next);
+                }
+            }
+        ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx)); });
+    };
+    /**
     * @method create
     * @description
     * Creates a new instance for either a model or scope model.
@@ -301,7 +360,7 @@ var FireLoop = (function () {
         ], function (err) { return FireLoop.publish(Object.assign({ err: err, input: input, removed: input.data }, ctx)); });
     };
     /**
-    * @method remove
+    * @method publish
     * @description
     * Publish gateway that will broadcast according the specific case.
     *
@@ -312,9 +371,18 @@ var FireLoop = (function () {
     FireLoop.publish = function (ctx) {
         // Response to the client that sent the request
         ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
+        // We don't broadcast if there is an error
         if (ctx.err) {
             return;
         }
+        // We only broadcast remote methods if the request is public since are unknown events
+        if (ctx.input && ctx.input.data && ctx.input.data.method) {
+            if (ctx.input && ctx.input.data && ctx.input.data.method && ctx.input.data.broadcast) {
+                FireLoop.broadcast(ctx, 'remote');
+            }
+            return;
+        }
+        // FireLoop events will be public by default since are known events
         if (ctx.data) {
             FireLoop.broadcast(ctx, 'value');
             if (ctx.created) {
@@ -327,7 +395,8 @@ var FireLoop = (function () {
         else if (ctx.removed) {
             FireLoop.broadcast(ctx, 'child_removed');
         }
-        // In any of the operations we call the changesevent
+        // In any write operations we call the following events
+        // except by custom remote methods.
         FireLoop.broadcast(ctx, 'change');
         FireLoop.broadcast(ctx, 'stats');
     };
@@ -342,8 +411,8 @@ var FireLoop = (function () {
     * WARNING: Do not pass the root context.
     *
     * There are 2 different type context used in this method
-    * 1.- ctx = user executing an operation (The trigger)
-    * 2.- context = each of all users subscribed to specific operations
+    * 1.- ctx = user executing an operation (Publisher)
+    * 2.- context = users subscribed to specific operations (Subscribers)
     **/
     FireLoop.broadcast = function (ctx, event) {
         logger_1.RealTimeLog.log("FireLoop " + event + " broadcasting");
@@ -352,10 +421,12 @@ var FireLoop = (function () {
                 var context = FireLoop.contexts[connContextId][contextId];
                 var scopeModelName = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
                 if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp("\\b" + scopeModelName + "." + context.subscription.relationship + "\\b", 'g'))) {
-                    if (event.match(/(child_changed|child_removed)/)) {
+                    if (event.match(/(child_changed|child_removed|remote)/)) {
                         context.socket.emit(ctx.modelName + "." + event + ".broadcast." + context.subscription.id, ctx.data || ctx.removed);
                     }
-                    context.socket.emit(ctx.modelName + "." + event + ".broadcast.announce." + context.subscription.id, 1);
+                    if (event !== 'remote') {
+                        context.socket.emit(ctx.modelName + "." + event + ".broadcast.announce." + context.subscription.id, 1);
+                    }
                 }
             });
         });
@@ -364,7 +435,7 @@ var FireLoop = (function () {
     /**
     * @method setupBroadcast
     * @description
-    * Setup the actual broadcast process, once it is announced byt the broadcast method.
+    * Setup the actual broadcast process, once it is announced by the broadcast method.
     *
     * Anyway, this setup needs to be done once and prior any broadcast, so it is
     * configured when the connection is made, before any broadcast announce.

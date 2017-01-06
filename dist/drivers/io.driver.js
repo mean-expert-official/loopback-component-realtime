@@ -20,6 +20,9 @@ var IODriver = (function () {
             logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
             ioAuth(this.server, {
                 authenticate: function (socket, token, next) {
+                    if (!token)
+                        return next(null, false);
+                    ;
                     var AccessToken = options.app.models.AccessToken;
                     //verify credentials sent by the client
                     var token = AccessToken.findOne({
@@ -59,7 +62,7 @@ var IODriver = (function () {
     };
     IODriver.prototype.onConnection = function (handler) {
         var _this = this;
-        this.server.on('connection', function (socket) { return handler(socket, _this.server); });
+        this.server.on('connect', function (socket) { return handler(socket, _this.server); });
     };
     IODriver.prototype.removeListener = function (name, listener) {
         this.server.sockets.removeListener(name, listener);

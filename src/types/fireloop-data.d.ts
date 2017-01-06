@@ -1,5 +1,5 @@
 /**
- * @module EventsInterface
+ * @module FireLoopData
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
  * @description
  * 

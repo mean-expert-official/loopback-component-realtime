@@ -24,6 +24,7 @@ export class IODriver implements DriverInterface {
       RealTimeLog.log('RTC authentication mechanism enabled');
       ioAuth(this.server, {
         authenticate: (socket: any, token: any, next: Function) => {
+          if (!token) return next(null, false);;
           var AccessToken = options.app.models.AccessToken;
           //verify credentials sent by the client
           var token = AccessToken.findOne({
@@ -67,7 +68,7 @@ export class IODriver implements DriverInterface {
   }
 
   onConnection(handler: Function): void {
-    this.server.on('connection', (socket: any) => handler(socket, this.server));
+    this.server.on('connect', (socket: any) => handler(socket, this.server));
   }
 
   removeListener(name: string, listener: Function): void {

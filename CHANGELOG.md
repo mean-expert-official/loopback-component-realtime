@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-rc.3
+
+- Handle client disconnections
+
 ### version 1.0.0-rc.2
 
 - Hot Fix Stats Event
