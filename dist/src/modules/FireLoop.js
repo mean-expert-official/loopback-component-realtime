@@ -77,7 +77,7 @@ var FireLoop = (function () {
         ctx.socket.on(ctx.modelName + ".dispose." + ctx.subscription.id, function (input) {
             // Notify we are releasing memory
             logger_1.RealTimeLog.log("FireLoop is releasing model subscription three with id " + ctx.subscription.id + " from memory");
-            // Dispose Remote Methods
+            // Remove all remote listeners
             ctx.socket.removeAllListeners(ctx.modelName + ".remote." + ctx.subscription.id);
             // Dispose Model Writings
             FireLoop.disposeModelWritings(ctx);
@@ -644,4 +644,4 @@ var FireLoop = (function () {
     return FireLoop;
 }());
 exports.FireLoop = FireLoop;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/FireLoop.js.map
+//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/src/modules/FireLoop.js.map

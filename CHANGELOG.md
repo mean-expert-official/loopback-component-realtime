@@ -1,5 +1,9 @@
 
 
+### version 1.0.0-rc.4
+
+- Dispose complete reference not only remote methods
+
 ### version 1.0.0-rc.3
 
 - Handle client disconnections

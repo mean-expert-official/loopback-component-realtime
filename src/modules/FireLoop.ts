@@ -82,8 +82,6 @@ export class FireLoop {
             };
             // Register remote method events
             FireLoop.setupRemoteMethods(FireLoop.contexts[socket.connContextId][subscription.id]);
-            // Register dispose method to removeAllListeners
-            FireLoop.setupDisposeReference(FireLoop.contexts[socket.connContextId][subscription.id]);
             // Iterate for writting events
             FireLoop.events.writings.forEach((event: string) => {
               FireLoop.setupModelWritings(FireLoop.contexts[socket.connContextId][subscription.id], event);
@@ -94,6 +92,8 @@ export class FireLoop {
               FireLoop.setupModelReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
               FireLoop.setupScopeReadings(FireLoop.contexts[socket.connContextId][subscription.id], event);
             });
+            // Register dispose method to removeAllListeners
+            FireLoop.setupDisposeReference(FireLoop.contexts[socket.connContextId][subscription.id]);
           });
         })
       );
@@ -112,7 +112,20 @@ export class FireLoop {
   static setupDisposeReference(ctx: any): void {
     ctx.socket.on(
       `${ctx.modelName}.dispose.${ctx.subscription.id}`,
-      (input: FireLoopData) => ctx.socket.removeAllListeners(`${ctx.modelName}.remote.${ctx.subscription.id}`)
+      (input: FireLoopData) => {
+        // Notify we are releasing memory
+        RealTimeLog.log(`FireLoop is releasing model subscription three with id ${ctx.subscription.id} from memory`);
+        // Dispose Remote Methods
+        ctx.socket.removeAllListeners(`${ctx.modelName}.remote.${ctx.subscription.id}`);
+        // Dispose Model Writings
+        FireLoop.disposeModelWritings(ctx);
+        // Dispose Scope Writings
+        FireLoop.disposeScopeWritings(ctx);
+        // Dispose Model Readings
+        FireLoop.disposeModelReadings(ctx);
+        // Dispose Scope Readings
+        FireLoop.disposeScopeReadings(ctx);
+      }
     );
   }
   /**
@@ -136,6 +149,16 @@ export class FireLoop {
       `${ctx.modelName}.${event}.${ctx.subscription.id}`,
       (input: FireLoopData) => (<any>FireLoop)[event](ctx, input)
     )
+  }
+  /**
+  * @method disposeModelWritings
+  * @description
+  * setup writting events for root models
+   */
+  static disposeModelWritings(ctx: any): void {
+    FireLoop.events.writings.forEach((event: string) => {
+      ctx.socket.removeAllListeners(`${ctx.modelName}.${event}.${ctx.subscription.id}`);
+    });
   }
   /**
   * @method setupModelReading
@@ -169,6 +192,16 @@ export class FireLoop {
     FireLoop.setupBroadcast(ctx, event);
   }
   /**
+  * @method disposeModelReadings
+  * @description
+  * setup writting events for root models
+  **/
+  static disposeModelReadings(ctx: any): void {
+    FireLoop.events.readings.forEach((event: string) => {
+      ctx.socket.removeAllListeners(`${ctx.modelName}.${event}.pull.request.${ctx.subscription.id}`);
+    });
+  }
+  /**
   * @method setupScopeWritings
   * @description
   * setup writting events for root models
@@ -190,6 +223,19 @@ export class FireLoop {
           (<any>FireLoop)[event](_ctx, input);
         }
       )
+    });
+  }
+  /**
+  * @method disposeScopeWritings
+  * @description
+  * setup writting events for root models
+   */
+  static disposeScopeWritings(ctx: any): void {
+    if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations) return;
+    FireLoop.events.writings.forEach((event: string) => {
+      Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach((scope: string) => {
+        ctx.socket.removeAllListeners(`${ctx.modelName}.${scope}.${event}.${ctx.subscription.id}`);
+      })
     });
   }
   /**
@@ -233,6 +279,20 @@ export class FireLoop {
       );
     });
   }
+  /**
+  * @method disposeScopeReadings
+  * @description
+  * setup writting events for root models
+   */
+  static disposeScopeReadings(ctx: any): void {
+    if (!FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations) return;
+    FireLoop.events.readings.forEach((event: string) => {
+      Object.keys(FireLoop.options.app.models[ctx.modelName].sharedClass.ctor.relations).forEach((scope: string) => {
+        ctx.socket.removeAllListeners(`${ctx.modelName}.${scope}.${event}.pull.request.${ctx.subscription.id}`);
+      })
+    });
+  }
+  /**
   /**
   * @method getReference
   * @description

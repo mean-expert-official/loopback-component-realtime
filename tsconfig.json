@@ -4,13 +4,13 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "noImplicitAny": true,
-    "mapRoot": "./",
+    "mapRoot": "src",
     "module": "commonjs",
-    "outDir": "../dist",
+    "outDir": "dist",
     "sourceMap": true,
     "target": "es5",
     "typeRoots": [
-      "../node_modules/@types"
+      "node_modules/@types"
     ],
     "types": [
       "chalk",
@@ -18,5 +18,9 @@
       "socket.io",
       "socket.io-client"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "tests"
+  ]
 }
