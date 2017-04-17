@@ -20,10 +20,21 @@ class RealTime {
 
   static driver  : DriverInterface;
   static options : OptionsInterface = {
-    driver  : { name: 'socket.io' },
+    driver  : {
+      name: 'socket.io',
+      options: {
+        // Client options
+        forceNew: true,
+        upgrade: false,
+        // Client/Server Options
+        transports: ['websocket'] // Enabled by default to fix handshake issues on clustered envs. (No IE9)
+        // Server Options
+        // ...
+      }
+    },
     debug   : false,
     auth    : true,
-    modules : [ 'PubSub', 'IO', 'FireLoop', 'WebRTCSignaler' ]
+    modules : [ 'PubSub', 'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
   };
 
   constructor(app: any = undefined, options: OptionsInterface) {

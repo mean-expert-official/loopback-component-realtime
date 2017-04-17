@@ -1,5 +1,10 @@
 
 
+### version 1.0.0-rc.5
+
+- Implemented Internal Event Distribution
+- Implemented Socket.io adapters interface
+
 ### version 1.0.0-rc.4
 
 - Dispose complete reference not only remote methods

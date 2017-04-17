@@ -1,6 +1,7 @@
 export interface DriverInterface {
   client?: any;
   server?: any;
+  internal?: any;
   isConnected?: boolean;
   connect(options?: any): any;
   emit(event:string, message: any): void;

@@ -68,7 +68,17 @@ export class FireLoop {
   * by iterating the LoopBack models and configuring the necessary events
   **/
   static setup(): void {
-    // Setup Each Connection
+    // Setup Server Side Broadcasts
+    Object.keys(FireLoop.options.app.models).forEach((modelName: string) => {
+      FireLoop.events.readings.forEach((event: string) => {
+        FireLoop.setupServerBroadcast({ modelName }, event);
+        if (!FireLoop.options.app.models[modelName].sharedClass.ctor.relations) return;
+        Object.keys(FireLoop.options.app.models[modelName].sharedClass.ctor.relations).forEach((scope: string) => {
+          FireLoop.setupServerBroadcast({ modelName: `${modelName}.${scope}` }, event);
+        });
+      });
+    });    
+    // Setup Client Side Connection
     FireLoop.driver.onConnection((socket: any) => {
       socket.connContextId = FireLoop.buildId();
       FireLoop.contexts[socket.connContextId] = {};
@@ -189,7 +199,7 @@ export class FireLoop {
         }
       }
     );
-    FireLoop.setupBroadcast(ctx, event);
+    FireLoop.setupClientBroadcast(ctx, event);
   }
   /**
   * @method disposeModelReadings
@@ -257,7 +267,7 @@ export class FireLoop {
         `${_ctx.modelName}.${event}.pull.request.${ctx.subscription.id}`,
         (request: any) => {
           _ctx.input = request; // Needs to be inside because we need scope params from request
-          FireLoop.setupBroadcast(_ctx, event);
+          FireLoop.setupClientBroadcast(_ctx, event);
           let _filter: any = Object.assign({}, request.filter);
           RealTimeLog.log(`FireLoop scope pull request received: ${JSON.stringify(_filter)}`);
           let emit: any = (err: any, data: any) => {
@@ -507,8 +517,9 @@ export class FireLoop {
   /**
   * @method broadcast
   * @description
-  * Announces a broadcast, emit data from changed or removed childs,
-  * then it will clean the context.
+  * Notifies other server instances to start a broadcasting process, this
+  * allows each server to notify their own clients upon their specific requests,
+  * then it will clean the context from the user that started the process.
   *
   * Context will be destroyed everytime, make sure the ctx passed is a
   * custom copy for current request or else bad things will happen :P.
@@ -520,31 +531,42 @@ export class FireLoop {
   **/
   static broadcast(ctx: any, event: string): void {
     RealTimeLog.log(`FireLoop ${event} broadcasting`);
-    Object.keys(FireLoop.contexts).forEach((connContextId: number) => {
-      Object.keys(FireLoop.contexts[connContextId]).forEach((contextId: number) => {
-        let context: any = FireLoop.contexts[connContextId][contextId];
-        let scopeModelName: string = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
-        if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp(`\\b${scopeModelName}\.${context.subscription.relationship}\\b`,'g'))) {
-          if (event.match(/(child_changed|child_removed|remote)/)) {
-            context.socket.emit(`${ctx.modelName}.${event}.broadcast.${context.subscription.id}`, ctx.data || ctx.removed);
-          }
-          if (event !== 'remote') {
-            context.socket.emit(`${ctx.modelName}.${event}.broadcast.announce.${context.subscription.id}`, 1);
-          }
-        }
-      });
-    });
+    FireLoop.driver.server.to('flint').emit(`${ctx.modelName}.${event}.broadcast`, ctx.data || ctx.removed);
     ctx = null;
   }
   /**
-  * @method setupBroadcast
+  * @method setupServerBroadcast
+  * @description
+  * Setup the broadcast process to notify other server instances that an event needs
+  * to be propagated between their own clients.
+  **/
+  static setupServerBroadcast(ctx: any, event: string): void {
+    FireLoop.driver.internal.on(`${ctx.modelName}.${event}.broadcast`, (payload: any) => {
+      Object.keys(FireLoop.contexts).forEach((connContextId: number) => {
+        Object.keys(FireLoop.contexts[connContextId]).forEach((contextId: number) => {
+          let context: any = FireLoop.contexts[connContextId][contextId];
+          let scopeModelName: string = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
+          if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp(`\\b${scopeModelName}\.${context.subscription.relationship}\\b`,'g'))) {
+            if (event.match(/(child_changed|child_removed|remote)/)) {
+              context.socket.emit(`${ctx.modelName}.${event}.broadcast.${context.subscription.id}`, payload);
+            }
+            if (event !== 'remote') {
+              context.socket.emit(`${ctx.modelName}.${event}.broadcast.announce.${context.subscription.id}`, 1);
+            }
+          }
+        });
+      });
+    });
+  }
+  /**
+  * @method setupClientBroadcast
   * @description
   * Setup the actual broadcast process, once it is announced by the broadcast method.
   *
   * Anyway, this setup needs to be done once and prior any broadcast, so it is
   * configured when the connection is made, before any broadcast announce.
   **/
-  static setupBroadcast(ctx: any, event: string): void {
+  static setupClientBroadcast(ctx: any, event: string): void {
     if (!event.match(/(value|change|stats|child_added)/)) { return; }
     RealTimeLog.log(`FireLoop setting up: ${ctx.modelName}.${event}.broadcast.request.${ctx.subscription.id}`);
     ctx.socket.on(`${ctx.modelName}.${event}.broadcast.request.${ctx.subscription.id}`, (request: any) => {

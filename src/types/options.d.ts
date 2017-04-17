@@ -12,8 +12,17 @@ export interface OptionsInterface {
   debug   : boolean,
   auth   ?: boolean,
   driver  : {
-    url  ?: string,
-    name  : string
+    url     ?: string,
+    name     : string,
+    options ?: {
+      transports ?: string[],
+      forceNew   ?: boolean,
+      upgrade    ?: boolean,
+      adapter    ?: {
+        name: string,
+        datasource: string
+      }
+    }
   };
   modules : Array<string>
 }
