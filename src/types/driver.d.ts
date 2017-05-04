@@ -13,4 +13,5 @@ export interface DriverInterface {
   onConnection?(callback: Function): void;
   removeListener(name: string, listener: Function): void;
   forEachConnection(handler: Function): void;
+  getUserConnection(userId: string): void;
 }

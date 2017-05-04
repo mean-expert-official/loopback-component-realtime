@@ -77,7 +77,7 @@ export class FireLoop {
           FireLoop.setupServerBroadcast({ modelName: `${modelName}.${scope}` }, event);
         });
       });
-    });    
+    });
     // Setup Client Side Connection
     FireLoop.driver.onConnection((socket: any) => {
       socket.connContextId = FireLoop.buildId();
@@ -139,6 +139,14 @@ export class FireLoop {
     );
   }
   /**
+  * @method getUserConnection
+  * @description
+  * will return a user connection from the given user Id
+   */
+  static getUserConnection(userId: string): void {
+    FireLoop.driver.getUserConnection(userId);
+  }
+  /**
   * @method setupRemoteMethods
   * @description
   * setup writting events for root models
@@ -188,15 +196,30 @@ export class FireLoop {
           ctx.socket.emit(`${ctx.modelName}.${event}.pull.requested.${ctx.subscription.id}`, err ? { error: err } : data);
         };
         // This works only for Root Models, related models are configured in setupScopes method
-        switch (event) {
-          case 'value':
-          case 'change':
-            ctx.Model.find(_request.filter, emit);
-            break;
-          case 'stats':
-            ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
-            break;
+        // Define the name of the method
+        let remoteEvent: string;
+        if (event.match('stats')) {
+          remoteEvent = 'stats';
+        } else {
+          remoteEvent = 'find';
         }
+        // Check for Access
+        FireLoop.checkAccess(ctx, ctx.Model, remoteEvent, ctx.input, (err: Error, hasAccess: boolean) => {
+          if (err) {
+            emit(err);
+          } else if (!hasAccess) {
+            emit(FireLoop.UNAUTHORIZED);
+          } else {
+            switch (remoteEvent) {
+              case 'find':
+                ctx.Model.find(_request.filter, emit);
+                break;
+              case 'stats':
+                ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
+                break;
+            }
+          }
+        });
       }
     );
     FireLoop.setupClientBroadcast(ctx, event);
@@ -493,7 +516,7 @@ export class FireLoop {
     if (ctx.err) { return; }
     // We only broadcast remote methods if the request is public since are unknown events
     if (ctx.input && ctx.input.data && ctx.input.data.method) {
-      if (ctx.input && ctx.input.data && ctx.input.data.method && ctx.input.data.broadcast) { 
+      if (ctx.input && ctx.input.data && ctx.input.data.method && ctx.input.data.broadcast) {
         FireLoop.broadcast(ctx, 'remote');
       }
       return;
@@ -546,7 +569,7 @@ export class FireLoop {
         Object.keys(FireLoop.contexts[connContextId]).forEach((contextId: number) => {
           let context: any = FireLoop.contexts[connContextId][contextId];
           let scopeModelName: string = context.modelName.match(/\./g) ? context.modelName.split('.').shift() : context.modelName;
-          if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp(`\\b${scopeModelName}\.${context.subscription.relationship}\\b`,'g'))) {
+          if (context.modelName === ctx.modelName || ctx.modelName.match(new RegExp(`\\b${scopeModelName}\.${context.subscription.relationship}\\b`, 'g'))) {
             if (event.match(/(child_changed|child_removed|remote)/)) {
               context.socket.emit(`${ctx.modelName}.${event}.broadcast.${context.subscription.id}`, payload);
             }
@@ -650,7 +673,8 @@ export class FireLoop {
   static checkAccess(ctx: any, ref: any, event: string, input: any, next: Function) {
     if (ref.checkAccess) {
       ref.checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-        name: event, aliases: [] }, {}, function (err: any, access: boolean) {
+        name: event, aliases: []
+      }, {}, function (err: any, access: boolean) {
         if (access) {
           next(null, ref);
         } else {
@@ -659,7 +683,8 @@ export class FireLoop {
       });
     } else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
       FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-        name: event, aliases: [] }, {}, function (err: any, access: boolean) {
+        name: event, aliases: []
+      }, {}, function (err: any, access: boolean) {
         if (access) {
           next(null, ref);
         } else {
@@ -667,7 +692,7 @@ export class FireLoop {
         }
       });
     } else {
-      RealTimeLog.log(`Reference not found for: ${ ctx.subscription.scope }`);
+      RealTimeLog.log(`Reference not found for: ${ctx.subscription.scope}`);
       next(FireLoop.UNAUTHORIZED, ref);
     }
   }

@@ -101,6 +101,14 @@ var FireLoop = (function () {
         });
     };
     /**
+    * @method getUserConnection
+    * @description
+    * will return a user connection from the given user Id
+     */
+    FireLoop.getUserConnection = function (userId) {
+        FireLoop.driver.getUserConnection(userId);
+    };
+    /**
     * @method setupRemoteMethods
     * @description
     * setup writting events for root models
@@ -143,15 +151,33 @@ var FireLoop = (function () {
                 ctx.socket.emit(ctx.modelName + "." + event + ".pull.requested." + ctx.subscription.id, err ? { error: err } : data);
             };
             // This works only for Root Models, related models are configured in setupScopes method
-            switch (event) {
-                case 'value':
-                case 'change':
-                    ctx.Model.find(_request.filter, emit);
-                    break;
-                case 'stats':
-                    ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
-                    break;
+            // Define the name of the method
+            var remoteEvent;
+            if (event.match('stats')) {
+                remoteEvent = 'stats';
             }
+            else {
+                remoteEvent = 'find';
+            }
+            // Check for Access
+            FireLoop.checkAccess(ctx, ctx.Model, remoteEvent, ctx.input, function (err, hasAccess) {
+                if (err) {
+                    emit(err);
+                }
+                else if (!hasAccess) {
+                    emit(FireLoop.UNAUTHORIZED);
+                }
+                else {
+                    switch (remoteEvent) {
+                        case 'find':
+                            ctx.Model.find(_request.filter, emit);
+                            break;
+                        case 'stats':
+                            ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
+                            break;
+                    }
+                }
+            });
         });
         FireLoop.setupClientBroadcast(ctx, event);
     };
@@ -604,7 +630,8 @@ var FireLoop = (function () {
     FireLoop.checkAccess = function (ctx, ref, event, input, next) {
         if (ref.checkAccess) {
             ref.checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-                name: event, aliases: [] }, {}, function (err, access) {
+                name: event, aliases: []
+            }, {}, function (err, access) {
                 if (access) {
                     next(null, ref);
                 }
@@ -615,7 +642,8 @@ var FireLoop = (function () {
         }
         else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
             FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-                name: event, aliases: [] }, {}, function (err, access) {
+                name: event, aliases: []
+            }, {}, function (err, access) {
                 if (access) {
                     next(null, ref);
                 }

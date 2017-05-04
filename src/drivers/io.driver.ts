@@ -167,6 +167,17 @@ export class IODriver implements DriverInterface {
     return this.server.of(event);
   }
 
+  getUserConnection(userId: string): void {
+    if (!userId || userId === '') return null;
+    let connection: any;
+    this.forEachConnection((_connection: any) => {
+      if (_connection.token && _connection.token.userId === userId) {
+        connection = _connection;
+      }
+    });
+    return connection;
+  }
+
   forEachConnection(handler: Function): void {
     this.connections.forEach((connection: any) => handler(connection));
   }
@@ -185,7 +196,10 @@ export class IODriver implements DriverInterface {
     socket.on('ME:RT:1://event', (input: { event: string, data: any }) => {
       this.server.emit(input.event, input.data);
     });
-    socket.on('disconnect', () => socket.removeAllListeners());
+    socket.on('disconnect', () => {
+      this.options.app.emit('socket-disconnect', socket);
+      socket.removeAllListeners();
+    });
     socket.on('lb-ping', () => socket.emit('lb-pong', new Date().getTime() / 1000));
     socket.on('fl-reg', () => socket.join('flint'))
   }

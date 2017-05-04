@@ -21,6 +21,9 @@ var RealTime = (function () {
         else {
             app.on('started', function (server) {
                 app.mx = app.mx || {};
+                if (!options.driver.options) {
+                    options.driver.options = RealTime.options.driver.options;
+                }
                 RealTime.options = Object.assign(RealTime.options, options, {
                     app: app,
                     server: server

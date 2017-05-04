@@ -157,6 +157,17 @@ var IODriver = (function () {
     IODriver.prototype.of = function (event) {
         return this.server.of(event);
     };
+    IODriver.prototype.getUserConnection = function (userId) {
+        if (!userId || userId === '')
+            return null;
+        var connection;
+        this.forEachConnection(function (_connection) {
+            if (_connection.token && _connection.token.userId === userId) {
+                connection = _connection;
+            }
+        });
+        return connection;
+    };
     IODriver.prototype.forEachConnection = function (handler) {
         this.connections.forEach(function (connection) { return handler(connection); });
     };
@@ -174,7 +185,10 @@ var IODriver = (function () {
         socket.on('ME:RT:1://event', function (input) {
             _this.server.emit(input.event, input.data);
         });
-        socket.on('disconnect', function () { return socket.removeAllListeners(); });
+        socket.on('disconnect', function () {
+            _this.options.app.emit('socket-disconnect', socket);
+            socket.removeAllListeners();
+        });
         socket.on('lb-ping', function () { return socket.emit('lb-pong', new Date().getTime() / 1000); });
         socket.on('fl-reg', function () { return socket.join('flint'); });
     };
