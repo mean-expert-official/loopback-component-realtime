@@ -68,6 +68,8 @@ export class FireLoop {
   * by iterating the LoopBack models and configuring the necessary events
   **/
   static setup(): void {
+    // Setup Hook Handlers
+    FireLoop.setupHooks();
     // Setup Server Side Broadcasts
     Object.keys(FireLoop.options.app.models).forEach((modelName: string) => {
       FireLoop.events.readings.forEach((event: string) => {
@@ -88,7 +90,7 @@ export class FireLoop {
           // Setup reference subscriptions
           socket.on(`Subscribe.${modelName}`, (subscription: SubscriptionInterface) => {
             FireLoop.contexts[socket.connContextId][subscription.id] = {
-              modelName, Model, socket, subscription
+              id: subscription.id, modelName, Model, socket, subscription
             };
             // Register remote method events
             FireLoop.setupRemoteMethods(FireLoop.contexts[socket.connContextId][subscription.id]);
@@ -145,6 +147,17 @@ export class FireLoop {
    */
   static getUserConnection(userId: string): void {
     FireLoop.driver.getUserConnection(userId);
+  }
+  /**
+  * @method setupHooks
+  * @description
+  * setup opeation hooks
+  **/
+  static setupHooks(): void {
+    FireLoop.driver.internal.on('create-hook', (event: any) => {
+      console.log('YEEE A MODEL WAS CREATED');
+      FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: true });
+    })
   }
   /**
   * @method setupRemoteMethods
@@ -417,9 +430,15 @@ export class FireLoop {
       },
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
       (ref: any, next: Function) => ref.create(input.data, next)
-    ], (err: any, data: any) => FireLoop.publish(
-      Object.assign({ err, input, data, created: true }, ctx))
-    );
+    ], (err: any, data: any) => {
+      if (err) {
+        RealTimeLog.log(`Error on creating instance`);
+        RealTimeLog.log(err);
+      } else {
+        RealTimeLog.log(`Created new instance`);
+        RealTimeLog.log(data);
+      }
+    });
   }
   /**
   * @method upsert
@@ -505,14 +524,23 @@ export class FireLoop {
   * Context will be destroyed everytime, make sure the ctx passed is a
   * custom copy for current request or else bad things will happen :P.
   * WARNING: Do not pass the root context.
+  *
+  * Optional ctx properties:
+  * ctx.subscription.id
+  * ctx.input
+  * Required ctx properties
+  * ctx.modelName
+  * ctx.data or ctx.removed
   **/
   static publish(ctx: any): void {
     // Response to the client that sent the request
-    ctx.socket.emit(
-      `${ctx.modelName}.value.result.${ctx.subscription.id}`,
-      ctx.err ? { error: ctx.err } : ctx.data || ctx.removed
-    );
-    // We don't broadcast if there is an error
+    if (ctx.subscription && ctx.subscription.id) {
+      ctx.socket.emit(
+        `${ctx.modelName}.value.result.${ctx.subscription.id}`,
+        ctx.err ? { error: ctx.err } : ctx.data || ctx.removed
+      );
+    }
+    // We don't broadcast to others if there is an error
     if (ctx.err) { return; }
     // We only broadcast remote methods if the request is public since are unknown events
     if (ctx.input && ctx.input.data && ctx.input.data.method) {

@@ -1,5 +1,6 @@
 "use strict";
-var logger_1 = require('../logger');
+Object.defineProperty(exports, "__esModule", { value: true });
+var logger_1 = require("../logger");
 /**
  * @module IO
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -57,8 +58,8 @@ var WebRTCSignaler = (function () {
             });
         });
     };
-    WebRTCSignaler.channels = {};
     return WebRTCSignaler;
 }());
+WebRTCSignaler.channels = {};
 exports.WebRTCSignaler = WebRTCSignaler;
 //# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/WebRTCSignaler.js.map

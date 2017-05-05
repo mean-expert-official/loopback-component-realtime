@@ -1,6 +1,7 @@
 "use strict";
-var logger_1 = require('../logger');
-var async = require('async');
+Object.defineProperty(exports, "__esModule", { value: true });
+var logger_1 = require("../logger");
+var async = require("async");
 /**
  * @module FireLoop
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -32,6 +33,8 @@ var FireLoop = (function () {
     * by iterating the LoopBack models and configuring the necessary events
     **/
     FireLoop.setup = function () {
+        // Setup Hook Handlers
+        FireLoop.setupHooks();
         // Setup Server Side Broadcasts
         Object.keys(FireLoop.options.app.models).forEach(function (modelName) {
             FireLoop.events.readings.forEach(function (event) {
@@ -53,7 +56,7 @@ var FireLoop = (function () {
                     // Setup reference subscriptions
                     socket.on("Subscribe." + modelName, function (subscription) {
                         FireLoop.contexts[socket.connContextId][subscription.id] = {
-                            modelName: modelName, Model: Model, socket: socket, subscription: subscription
+                            id: subscription.id, modelName: modelName, Model: Model, socket: socket, subscription: subscription
                         };
                         // Register remote method events
                         FireLoop.setupRemoteMethods(FireLoop.contexts[socket.connContextId][subscription.id]);
@@ -107,6 +110,17 @@ var FireLoop = (function () {
      */
     FireLoop.getUserConnection = function (userId) {
         FireLoop.driver.getUserConnection(userId);
+    };
+    /**
+    * @method setupHooks
+    * @description
+    * setup opeation hooks
+    **/
+    FireLoop.setupHooks = function () {
+        FireLoop.driver.internal.on('create-hook', function (event) {
+            console.log('YEEE A MODEL WAS CREATED');
+            FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: true });
+        });
     };
     /**
     * @method setupRemoteMethods
@@ -379,7 +393,16 @@ var FireLoop = (function () {
             },
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) { return ref.create(input.data, next); }
-        ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx)); });
+        ], function (err, data) {
+            if (err) {
+                logger_1.RealTimeLog.log("Error on creating instance");
+                logger_1.RealTimeLog.log(err);
+            }
+            else {
+                logger_1.RealTimeLog.log("Created new instance");
+                logger_1.RealTimeLog.log(data);
+            }
+        });
     };
     /**
     * @method upsert
@@ -466,11 +489,20 @@ var FireLoop = (function () {
     * Context will be destroyed everytime, make sure the ctx passed is a
     * custom copy for current request or else bad things will happen :P.
     * WARNING: Do not pass the root context.
+    *
+    * Optional ctx properties:
+    * ctx.subscription.id
+    * ctx.input
+    * Required ctx properties
+    * ctx.modelName
+    * ctx.data or ctx.removed
     **/
     FireLoop.publish = function (ctx) {
         // Response to the client that sent the request
-        ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
-        // We don't broadcast if there is an error
+        if (ctx.subscription && ctx.subscription.id) {
+            ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
+        }
+        // We don't broadcast to others if there is an error
         if (ctx.err) {
             return;
         }
@@ -673,26 +705,26 @@ var FireLoop = (function () {
             return id;
         }
     };
-    /**
-     * @property UNAUTHORIZED: string
-     * Constant for UNAUTHORIZED Events
-     **/
-    FireLoop.UNAUTHORIZED = '401 Unauthorized Event';
-    /**
-     * @property events: OptionsInterface
-     * The options object that are injected from the main module
-     **/
-    FireLoop.events = {
-        readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
-        writings: ['create', 'upsert', 'remove'],
-    };
-    /**
-     * @property context {[ id: number ]: {[ id: number ]: Object }}
-     * Context container, it will temporally store contexts. These
-     * are automatically deleted when client disconnects.
-     **/
-    FireLoop.contexts = {};
     return FireLoop;
 }());
+/**
+ * @property UNAUTHORIZED: string
+ * Constant for UNAUTHORIZED Events
+ **/
+FireLoop.UNAUTHORIZED = '401 Unauthorized Event';
+/**
+ * @property events: OptionsInterface
+ * The options object that are injected from the main module
+ **/
+FireLoop.events = {
+    readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
+    writings: ['create', 'upsert', 'remove'],
+};
+/**
+ * @property context {[ id: number ]: {[ id: number ]: Object }}
+ * Context container, it will temporally store contexts. These
+ * are automatically deleted when client disconnects.
+ **/
+FireLoop.contexts = {};
 exports.FireLoop = FireLoop;
 //# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/FireLoop.js.map

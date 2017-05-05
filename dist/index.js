@@ -1,6 +1,7 @@
 "use strict";
-var factory_1 = require('./drivers/factory');
-var logger_1 = require('./logger');
+Object.defineProperty(exports, "__esModule", { value: true });
+var factory_1 = require("./drivers/factory");
+var logger_1 = require("./logger");
 /**
  * @module @mean-expert/loopback-component-realtime
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
@@ -43,22 +44,24 @@ var RealTime = (function () {
                 require("./modules/" + _module)[_module](RealTime.driver, RealTime.options);
         });
     };
-    RealTime.options = {
-        driver: {
-            name: 'socket.io',
-            options: {
-                // Client options
-                forceNew: true,
-                upgrade: false,
-                // Client/Server Options
-                transports: ['websocket'] // Enabled by default to fix handshake issues on clustered envs. (No IE9)
-            }
-        },
-        debug: false,
-        auth: true,
-        modules: ['PubSub', 'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
-    };
     return RealTime;
 }());
+RealTime.options = {
+    driver: {
+        name: 'socket.io',
+        options: {
+            // Client options
+            forceNew: true,
+            upgrade: false,
+            // Client/Server Options
+            transports: ['websocket'] // Enabled by default to fix handshake issues on clustered envs. (No IE9)
+            // Server Options
+            // ...
+        }
+    },
+    debug: false,
+    auth: true,
+    modules: ['PubSub', 'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
+};
 module.exports = RealTime;
 //# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/index.js.map

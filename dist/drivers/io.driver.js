@@ -1,7 +1,8 @@
 "use strict";
-var logger_1 = require('../logger');
-var server = require('socket.io');
-var client = require('socket.io-client');
+Object.defineProperty(exports, "__esModule", { value: true });
+var logger_1 = require("../logger");
+var server = require("socket.io");
+var client = require("socket.io-client");
 var ioAuth = require('socketio-auth');
 var IODriver = (function () {
     function IODriver() {

@@ -1,5 +1,6 @@
 "use strict";
-var logger_1 = require('../logger');
+Object.defineProperty(exports, "__esModule", { value: true });
+var logger_1 = require("../logger");
 /**
  * @module PubSub
  * @author Jonathan Casarrubias <t:@johncasarrubias, gh:github.com/mean-expert-official>
