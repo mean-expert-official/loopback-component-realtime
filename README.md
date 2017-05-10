@@ -46,7 +46,7 @@ Update the  `server/model-config.json` as follows:
         "loopback/server/mixins",
         "../common/mixins",
         "./mixins",
-        "../node_modules/loopback-component-realtime/dist/mixins"
+        "../node_modules/@mean-expert/loopback-component-realtime/dist/mixins"
     ]
 }
 ````
@@ -75,9 +75,3 @@ app.start = function() {
 
 # Generate FireLoop Angular 2 Client
 FireLoop Client for Angular 2 Applications are built in when generating your LoopBack SDK. Read the [Following Instructions](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/1.-Install-Builder-&-Build-SDK) in order to automatically generate your software development kit.
-
-
-
-
-
-
