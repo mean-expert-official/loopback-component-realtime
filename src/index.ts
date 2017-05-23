@@ -34,7 +34,7 @@ class RealTime {
     },
     debug   : false,
     auth    : true,
-    modules : [ 'PubSub', 'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
+    modules : [ /*'PubSub' Deprecated,*/'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
   };
 
   constructor(app: any = undefined, options: OptionsInterface) {
@@ -44,12 +44,13 @@ class RealTime {
     } else {
       app.on('started', (server: any) => {
         app.mx = app.mx || {};
-        if (!options.driver.options) {
+        if (options.driver && !options.driver.options) {
           options.driver.options = RealTime.options.driver.options;
         }
         RealTime.options = Object.assign(RealTime.options, options, {
           app    : app,
-          server : server
+          server : server,
+          driver : RealTime.options.driver
         });
         RealTime.connect();
         RealTime.setup();

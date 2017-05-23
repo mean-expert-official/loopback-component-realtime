@@ -153,11 +153,10 @@ export class FireLoop {
   * @description
   * setup opeation hooks
   **/
-  static setupHooks(): void {
+  static setupHooks(): void { 
     FireLoop.driver.internal.on('create-hook', (event: any) => {
-      console.log('YEEE A MODEL WAS CREATED');
-      FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: true });
-    })
+      FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: event.created });
+    });
   }
   /**
   * @method setupRemoteMethods
@@ -225,7 +224,7 @@ export class FireLoop {
           } else {
             switch (remoteEvent) {
               case 'find':
-                ctx.Model.find(_request.filter, emit);
+                ctx.Model.find(_request.filter, { accessToken: ctx.socket.token },emit);
                 break;
               case 'stats':
                 ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
@@ -414,9 +413,10 @@ export class FireLoop {
   **/
   static create(ctx: any, input: FireLoopData): void {
     RealTimeLog.log(`FireLoop starting create: ${ctx.modelName}: ${JSON.stringify(input)}`);
+    let isScoped: boolean = ctx.modelName.match(/\./g);
     async.waterfall([
       (next: Function) => {
-        if (ctx.modelName.match(/\./g)) {
+        if (isScoped) {
           FireLoop.getReference(ctx.modelName, input, (ref: any) => {
             if (!ref) {
               next({ error: `${ctx.modelName} Model reference was not found.` });
@@ -429,14 +429,12 @@ export class FireLoop {
         }
       },
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
-      (ref: any, next: Function) => ref.create(input.data, next)
+      (ref: any, next: Function) => ref.create(input.data, { accessToken: ctx.socket.token }, next)
     ], (err: any, data: any) => {
-      if (err) {
-        RealTimeLog.log(`Error on creating instance`);
-        RealTimeLog.log(err);
-      } else {
-        RealTimeLog.log(`Created new instance`);
-        RealTimeLog.log(data);
+      if (isScoped) {
+        FireLoop.publish(
+          Object.assign({ err, input, data, created: true }, ctx)
+        );
       }
     });
   }
@@ -452,10 +450,11 @@ export class FireLoop {
   static upsert(ctx: any, input: FireLoopData): void {
     let created: boolean;
     RealTimeLog.log(`FireLoop starting upsert: ${ctx.modelName}: ${JSON.stringify(input)}`);
+    let isScoped: boolean = ctx.modelName.match(/\./g);
     // Wont use findOrCreate because only works at level 1, does not work on related references
     async.waterfall([
       (next: Function) => {
-        if (ctx.modelName.match(/\./g)) {
+        if (isScoped) {
           FireLoop.getReference(ctx.modelName, input, (ref: any) => {
             if (!ref) {
               next({ error: `${ctx.modelName} Model reference was not found.` });
@@ -473,15 +472,19 @@ export class FireLoop {
         if (inst) {
           created = false;
           Object.keys(input.data).forEach((key: string) => inst[key] = input.data[key]);
-          inst.save(next);
+          inst.save({ accessToken: ctx.socket.token }, next);
         } else {
           created = true;
-          ref.create(input.data, next);
+          ref.create(input.data, { accessToken: ctx.socket.token }, next);
         }
       }
-    ], (err: any, data: any) => FireLoop.publish(
-      Object.assign({ err, input, data, created }, ctx))
-    );
+    ], (err: any, data: any) => {
+      if (isScoped) {
+        FireLoop.publish(
+          Object.assign({ err, input, data, created }, ctx)
+        );
+      }
+    });
   }
   /**
   * @method remove
@@ -510,8 +513,8 @@ export class FireLoop {
       },
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, ref.destroy ? 'destroy' : 'removeById', input, next),
       (ref: any, next: Function) => ref.destroy
-        ? ref.destroy(input.data.id, next)
-        : ref.removeById(input.data.id, next)
+        ? ref.destroy(input.data.id, { accessToken: ctx.socket.token }, next)
+        : ref.removeById(input.data.id, { accessToken: ctx.socket.token }, next)
     ], (err: any) => FireLoop.publish(
       Object.assign({ err, input, removed: input.data }, ctx))
     );
@@ -676,7 +679,7 @@ export class FireLoop {
                 if (ctx.modelName.match(/\./g)) {
                   ref(_request.filter, broadcast);
                 } else {
-                  ref.find(_request.filter, broadcast);
+                  ref.find(_request.filter, { accessToken: ctx.socket.token }, broadcast);
                 }
                 break;
               case 'stats':

@@ -118,8 +118,7 @@ var FireLoop = (function () {
     **/
     FireLoop.setupHooks = function () {
         FireLoop.driver.internal.on('create-hook', function (event) {
-            console.log('YEEE A MODEL WAS CREATED');
-            FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: true });
+            FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: event.created });
         });
     };
     /**
@@ -184,7 +183,7 @@ var FireLoop = (function () {
                 else {
                     switch (remoteEvent) {
                         case 'find':
-                            ctx.Model.find(_request.filter, emit);
+                            ctx.Model.find(_request.filter, { accessToken: ctx.socket.token }, emit);
                             break;
                         case 'stats':
                             ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
@@ -375,9 +374,10 @@ var FireLoop = (function () {
     **/
     FireLoop.create = function (ctx, input) {
         logger_1.RealTimeLog.log("FireLoop starting create: " + ctx.modelName + ": " + JSON.stringify(input));
+        var isScoped = ctx.modelName.match(/\./g);
         async.waterfall([
             function (next) {
-                if (ctx.modelName.match(/\./g)) {
+                if (isScoped) {
                     FireLoop.getReference(ctx.modelName, input, function (ref) {
                         if (!ref) {
                             next({ error: ctx.modelName + " Model reference was not found." });
@@ -392,15 +392,10 @@ var FireLoop = (function () {
                 }
             },
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
-            function (ref, next) { return ref.create(input.data, next); }
+            function (ref, next) { return ref.create(input.data, { accessToken: ctx.socket.token }, next); }
         ], function (err, data) {
-            if (err) {
-                logger_1.RealTimeLog.log("Error on creating instance");
-                logger_1.RealTimeLog.log(err);
-            }
-            else {
-                logger_1.RealTimeLog.log("Created new instance");
-                logger_1.RealTimeLog.log(data);
+            if (isScoped) {
+                FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx));
             }
         });
     };
@@ -416,10 +411,11 @@ var FireLoop = (function () {
     FireLoop.upsert = function (ctx, input) {
         var created;
         logger_1.RealTimeLog.log("FireLoop starting upsert: " + ctx.modelName + ": " + JSON.stringify(input));
+        var isScoped = ctx.modelName.match(/\./g);
         // Wont use findOrCreate because only works at level 1, does not work on related references
         async.waterfall([
             function (next) {
-                if (ctx.modelName.match(/\./g)) {
+                if (isScoped) {
                     FireLoop.getReference(ctx.modelName, input, function (ref) {
                         if (!ref) {
                             next({ error: ctx.modelName + " Model reference was not found." });
@@ -439,14 +435,18 @@ var FireLoop = (function () {
                 if (inst) {
                     created = false;
                     Object.keys(input.data).forEach(function (key) { return inst[key] = input.data[key]; });
-                    inst.save(next);
+                    inst.save({ accessToken: ctx.socket.token }, next);
                 }
                 else {
                     created = true;
-                    ref.create(input.data, next);
+                    ref.create(input.data, { accessToken: ctx.socket.token }, next);
                 }
             }
-        ], function (err, data) { return FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: created }, ctx)); });
+        ], function (err, data) {
+            if (isScoped) {
+                FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: created }, ctx));
+            }
+        });
     };
     /**
     * @method remove
@@ -477,8 +477,8 @@ var FireLoop = (function () {
             },
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, ref.destroy ? 'destroy' : 'removeById', input, next); },
             function (ref, next) { return ref.destroy
-                ? ref.destroy(input.data.id, next)
-                : ref.removeById(input.data.id, next); }
+                ? ref.destroy(input.data.id, { accessToken: ctx.socket.token }, next)
+                : ref.removeById(input.data.id, { accessToken: ctx.socket.token }, next); }
         ], function (err) { return FireLoop.publish(Object.assign({ err: err, input: input, removed: input.data }, ctx)); });
     };
     /**
@@ -637,7 +637,7 @@ var FireLoop = (function () {
                                     ref(_request.filter, broadcast);
                                 }
                                 else {
-                                    ref.find(_request.filter, broadcast);
+                                    ref.find(_request.filter, { accessToken: ctx.socket.token }, broadcast);
                                 }
                                 break;
                             case 'stats':

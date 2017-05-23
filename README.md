@@ -3,7 +3,7 @@
 
 A [LoopBack Framework](http://loopback.io) Component that provides publish events over WebSockets.
 
-This module will supersedes the [LoopBack Component PubSub](https://github.com/mean-expert-official/loopback-component-pubsub) and will implement multiple Real-Time functionalities like PubSub, IO and the new [FireLoop Module](https://github.com/mean-expert-official/loopback-sdk-builder/wiki/8.-(NEW)-FireLoop-API).
+This module will supersedes the [LoopBack Component PubSub](https://github.com/mean-expert-official/loopback-component-pubsub) and implements the new [FireLoop Module](http://fireloop.io).
 
 # Installation
 
@@ -25,13 +25,7 @@ Update the  `server/component-config.json` as follows:
     "auth": true,
     "driver": {
       "name": "socket.io"
-    },
-    "modules": [
-      "IO",
-      "PubSub",
-      "FireLoop",
-      "WebRTCSignaler"
-    ]
+    }
   }
 }
 
@@ -51,7 +45,24 @@ Update the  `server/model-config.json` as follows:
 }
 ````
 
-Finally update the file `server/server.js` by editing the `app.start` method as follow:
+# Enable Model to use FireLoop API
+
+From version `1.0.0-rc.8` you need to specify in which models you want to enable FireLoop events to be sent.
+
+>Explanation: In an attempt to enable server and rest triggered events a new mixin has been introduced, this will trigger events either from REST calls or from the NodeJS Api e.g. Model.create().
+
+`NOTE: Due a LoopBack limitation the server triggered events are only available for root model methods (Model.create()), but it won't work for relationship methods, these will continue being executed only from FireLoop Child References in the Front-End`
+
+````json
+{
+  "mixins": {
+    "FireLoop": true
+  }
+}
+````
+
+# Update Server
+To propagate the App from LoopBack to FireLoop, so to finalize just update the file `server/server.js` by editing the `app.start` method as follow:
 
 ````js
 app.start = function() {

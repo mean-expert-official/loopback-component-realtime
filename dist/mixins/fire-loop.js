@@ -31,7 +31,8 @@ var FireLoopMixin = (function () {
         Model.observe('after save', function (ctx, next) {
             Model.app.mx.IO.driver.server.to('flint').emit('create-hook', {
                 modelName: ctx.Model.modelName,
-                data: ctx.instance
+                data: ctx.instance,
+                created: ctx.isNewInstance
             });
             next();
         });
