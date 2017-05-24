@@ -72,7 +72,7 @@ export class FireLoop {
     FireLoop.setupHooks();
     // Setup Server Side Broadcasts
     Object.keys(FireLoop.options.app.models).forEach((modelName: string) => {
-      FireLoop.options.app.models[modelName].mixin('FireLoop');
+      // TODO: verify why this is not working: FireLoop.options.app.models[modelName].mixin('FireLoop');
       FireLoop.events.readings.forEach((event: string) => {
         FireLoop.setupServerBroadcast({ modelName }, event);
         if (!FireLoop.options.app.models[modelName].sharedClass.ctor.relations) return;
