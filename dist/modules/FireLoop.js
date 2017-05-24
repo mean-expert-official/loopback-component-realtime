@@ -37,6 +37,7 @@ var FireLoop = (function () {
         FireLoop.setupHooks();
         // Setup Server Side Broadcasts
         Object.keys(FireLoop.options.app.models).forEach(function (modelName) {
+            FireLoop.options.app.models[modelName].mixin('FireLoop');
             FireLoop.events.readings.forEach(function (event) {
                 FireLoop.setupServerBroadcast({ modelName: modelName }, event);
                 if (!FireLoop.options.app.models[modelName].sharedClass.ctor.relations)

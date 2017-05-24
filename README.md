@@ -43,23 +43,6 @@ Update the  `server/model-config.json` as follows:
         "../node_modules/@mean-expert/loopback-component-realtime/dist/mixins"
     ]
 }
-````
-
-# Enable Model to use FireLoop API
-
-From version `1.0.0-rc.8` you need to specify in which models you want to enable FireLoop events to be sent.
-
->Explanation: In an attempt to enable server and rest triggered events a new mixin has been introduced, this will trigger events either from REST calls or from the NodeJS Api e.g. Model.create().
-
-`NOTE: Due a LoopBack limitation the server triggered events are only available for root model methods (Model.create()), but it won't work for relationship methods, these will continue being executed only from FireLoop Child References in the Front-End`
-
-````json
-{
-  "mixins": {
-    "FireLoop": true
-  }
-}
-````
 
 # Update Server
 To propagate the App from LoopBack to FireLoop, so to finalize just update the file `server/server.js` by editing the `app.start` method as follow:
