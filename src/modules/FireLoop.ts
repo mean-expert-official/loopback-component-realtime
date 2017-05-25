@@ -112,7 +112,7 @@ export class FireLoop {
       );
       // Clean client contexts from the server memory when client disconnects :D
       socket.on('disconnect', () => {
-        RealTimeLog.log(`FireLoop is releasing context three with id ${socket.connContextId} from memory`);
+        RealTimeLog.log(`FireLoop is releasing context tree with id ${socket.connContextId} from memory`);
         delete FireLoop.contexts[socket.connContextId];
       });
     });
@@ -127,7 +127,7 @@ export class FireLoop {
       `${ctx.modelName}.dispose.${ctx.subscription.id}`,
       (input: FireLoopData) => {
         // Notify we are releasing memory
-        RealTimeLog.log(`FireLoop is releasing model subscription three with id ${ctx.subscription.id} from memory`);
+        RealTimeLog.log(`FireLoop is releasing model subscription tree with id ${ctx.subscription.id} from memory`);
         // Dispose Remote Methods
         ctx.socket.removeAllListeners(`${ctx.modelName}.remote.${ctx.subscription.id}`);
         // Dispose Model Writings
@@ -432,7 +432,7 @@ export class FireLoop {
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
       (ref: any, next: Function) => ref.create(input.data, { accessToken: ctx.socket.token }, next)
     ], (err: any, data: any) => {
-      if (isScoped) {
+      if (isScoped || err) {
         FireLoop.publish(
           Object.assign({ err, input, data, created: true }, ctx)
         );
@@ -468,7 +468,13 @@ export class FireLoop {
         }
       },
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
-      (ref: any, next: Function) => ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst)),
+      (ref: any, next: Function) => {
+        if (input.data.id) {
+          ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst))
+        } else {
+          next(null, ref, null)
+        }
+      },
       (ref: any, inst: any, next: Function) => {
         if (inst) {
           created = false;
@@ -480,7 +486,7 @@ export class FireLoop {
         }
       }
     ], (err: any, data: any) => {
-      if (isScoped) {
+      if (isScoped || err) {
         FireLoop.publish(
           Object.assign({ err, input, data, created }, ctx)
         );

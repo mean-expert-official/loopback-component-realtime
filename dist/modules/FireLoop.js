@@ -78,7 +78,7 @@ var FireLoop = (function () {
             });
             // Clean client contexts from the server memory when client disconnects :D
             socket.on('disconnect', function () {
-                logger_1.RealTimeLog.log("FireLoop is releasing context three with id " + socket.connContextId + " from memory");
+                logger_1.RealTimeLog.log("FireLoop is releasing context tree with id " + socket.connContextId + " from memory");
                 delete FireLoop.contexts[socket.connContextId];
             });
         });
@@ -91,7 +91,7 @@ var FireLoop = (function () {
     FireLoop.setupDisposeReference = function (ctx) {
         ctx.socket.on(ctx.modelName + ".dispose." + ctx.subscription.id, function (input) {
             // Notify we are releasing memory
-            logger_1.RealTimeLog.log("FireLoop is releasing model subscription three with id " + ctx.subscription.id + " from memory");
+            logger_1.RealTimeLog.log("FireLoop is releasing model subscription tree with id " + ctx.subscription.id + " from memory");
             // Dispose Remote Methods
             ctx.socket.removeAllListeners(ctx.modelName + ".remote." + ctx.subscription.id);
             // Dispose Model Writings
@@ -395,7 +395,7 @@ var FireLoop = (function () {
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) { return ref.create(input.data, { accessToken: ctx.socket.token }, next); }
         ], function (err, data) {
-            if (isScoped) {
+            if (isScoped || err) {
                 FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx));
             }
         });
@@ -431,7 +431,14 @@ var FireLoop = (function () {
                 }
             },
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
-            function (ref, next) { return ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); }); },
+            function (ref, next) {
+                if (input.data.id) {
+                    ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); });
+                }
+                else {
+                    next(null, ref, null);
+                }
+            },
             function (ref, inst, next) {
                 if (inst) {
                     created = false;
@@ -444,7 +451,7 @@ var FireLoop = (function () {
                 }
             }
         ], function (err, data) {
-            if (isScoped) {
+            if (isScoped || err) {
                 FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: created }, ctx));
             }
         });

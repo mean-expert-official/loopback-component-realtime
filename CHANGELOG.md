@@ -1,3 +1,13 @@
+### version 1.0.0-rc.8.3
+
+- Hot Fix: Publish broadcast on error
+- Hot Fix: Fix upsert method
+- Fix: Remove userId from access token verification
+
+### version 1.0.0-rc.8.2
+
+- Revert 1.0.0-rc.8.1
+
 ### version 1.0.0-rc.8.1
 
 - Fix: https://github.com/mean-expert-official/loopback-component-realtime/issues/37

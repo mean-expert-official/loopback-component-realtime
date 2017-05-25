@@ -91,7 +91,7 @@ export class IODriver implements DriverInterface {
           var AccessToken = this.options.app.models.AccessToken;
           //verify credentials sent by the client
           var token = AccessToken.findOne({
-            where: { id: token.id || 0, userId: token.userId || 0 }
+            where: { id: token.id || 0 }
           }, (err: any, tokenInstance: any) => {
             if (tokenInstance) {
               socket.token = tokenInstance;

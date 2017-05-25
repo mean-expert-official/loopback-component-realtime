@@ -83,7 +83,7 @@ var IODriver = (function () {
                     var AccessToken = _this.options.app.models.AccessToken;
                     //verify credentials sent by the client
                     var token = AccessToken.findOne({
-                        where: { id: token.id || 0, userId: token.userId || 0 }
+                        where: { id: token.id || 0 }
                     }, function (err, tokenInstance) {
                         if (tokenInstance) {
                             socket.token = tokenInstance;
