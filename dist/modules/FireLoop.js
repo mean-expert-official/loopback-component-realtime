@@ -395,8 +395,10 @@ var FireLoop = (function () {
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) { return ref.create(input.data, { accessToken: ctx.socket.token }, next); }
         ], function (err, data) {
-            if (isScoped || err) {
-                FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: true }, ctx));
+            var resultContext = Object.assign({ err: err, input: input, data: data, created: true }, ctx);
+            FireLoop.response(resultContext);
+            if (isScoped) {
+                FireLoop.publish(resultContext);
             }
         });
     };
@@ -451,8 +453,10 @@ var FireLoop = (function () {
                 }
             }
         ], function (err, data) {
-            if (isScoped || err) {
-                FireLoop.publish(Object.assign({ err: err, input: input, data: data, created: created }, ctx));
+            var resultContext = Object.assign({ err: err, input: input, data: data, created: true }, ctx);
+            FireLoop.response(resultContext);
+            if (isScoped) {
+                FireLoop.publish(resultContext);
             }
         });
     };
@@ -490,6 +494,17 @@ var FireLoop = (function () {
         ], function (err) { return FireLoop.publish(Object.assign({ err: err, input: input, removed: input.data }, ctx)); });
     };
     /**
+    * @method response
+    * @description
+    * Response to client who started this process
+    **/
+    FireLoop.response = function (ctx) {
+        // Response to the client that sent the request
+        if (ctx.subscription && ctx.subscription.id) {
+            ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
+        }
+    };
+    /**
     * @method publish
     * @description
     * Publish gateway that will broadcast according the specific case.
@@ -506,10 +521,6 @@ var FireLoop = (function () {
     * ctx.data or ctx.removed
     **/
     FireLoop.publish = function (ctx) {
-        // Response to the client that sent the request
-        if (ctx.subscription && ctx.subscription.id) {
-            ctx.socket.emit(ctx.modelName + ".value.result." + ctx.subscription.id, ctx.err ? { error: ctx.err } : ctx.data || ctx.removed);
-        }
         // We don't broadcast to others if there is an error
         if (ctx.err) {
             return;
