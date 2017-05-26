@@ -518,9 +518,11 @@ export class FireLoop {
       (ref: any, next: Function) => ref.destroy
         ? ref.destroy(input.data.id, { accessToken: ctx.socket.token }, next)
         : ref.removeById(input.data.id, { accessToken: ctx.socket.token }, next)
-    ], (err: any) => FireLoop.publish(
-      Object.assign({ err, input, removed: input.data }, ctx))
-    );
+    ], (err: any) => {
+      const resultContext = Object.assign({ err, input, removed: input.data }, ctx);
+      FireLoop.response(resultContext);
+      FireLoop.publish(resultContext);
+    });
   }
   /**
   * @method response

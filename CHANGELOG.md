@@ -1,3 +1,7 @@
+### version 1.0.0-rc.8.5
+
+- Hot Fix: Response Error to client starting the process on remove
+
 ### version 1.0.0-rc.8.4
 
 - Hot Fix: Response Error to client starting the process

@@ -491,7 +491,11 @@ var FireLoop = (function () {
             function (ref, next) { return ref.destroy
                 ? ref.destroy(input.data.id, { accessToken: ctx.socket.token }, next)
                 : ref.removeById(input.data.id, { accessToken: ctx.socket.token }, next); }
-        ], function (err) { return FireLoop.publish(Object.assign({ err: err, input: input, removed: input.data }, ctx)); });
+        ], function (err) {
+            var resultContext = Object.assign({ err: err, input: input, removed: input.data }, ctx);
+            FireLoop.response(resultContext);
+            FireLoop.publish(resultContext);
+        });
     };
     /**
     * @method response
