@@ -1,3 +1,7 @@
+### version 1.0.0-rc.8.6
+
+- Hot Fix: Change findOne for findById on upsert method
+
 ### version 1.0.0-rc.8.5
 
 - Hot Fix: Response Error to client starting the process on remove

@@ -468,7 +468,7 @@ export class FireLoop {
       (ref: any, next: Function) => FireLoop.checkAccess(ctx, ref, 'create', input, next),
       (ref: any, next: Function) => {
         if (input.data.id) {
-          ref.findOne({ where: { id: input.data.id } }, (err: any, inst: any) => next(err, ref, inst))
+          ref.findById(input.data.id, (err: any, inst: any) => next(err, ref, inst))
         } else {
           next(null, ref, null)
         }

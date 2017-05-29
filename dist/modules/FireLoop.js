@@ -435,7 +435,7 @@ var FireLoop = (function () {
             function (ref, next) { return FireLoop.checkAccess(ctx, ref, 'create', input, next); },
             function (ref, next) {
                 if (input.data.id) {
-                    ref.findOne({ where: { id: input.data.id } }, function (err, inst) { return next(err, ref, inst); });
+                    ref.findById(input.data.id, function (err, inst) { return next(err, ref, inst); });
                 }
                 else {
                     next(null, ref, null);
