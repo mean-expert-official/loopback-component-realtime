@@ -696,8 +696,21 @@ var FireLoop = (function () {
             });
         }
         else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
-            FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-                name: event, aliases: []
+            var relationName = ctx.modelName.split('.').pop();
+            var methodName = '';
+            switch (event) {
+                case 'create':
+                case 'upsert':
+                    methodName = "__create__" + relationName;
+                    break;
+                case 'remove':
+                    methodName = "__delete__" + relationName;
+                    break;
+                default:
+                    methodName = "__get__" + relationName;
+            }
+            ctx.Model.checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
+                name: methodName, aliases: []
             }, {}, function (err, access) {
                 if (access) {
                     next(null, ref);

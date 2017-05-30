@@ -154,7 +154,7 @@ export class FireLoop {
   * @description
   * setup opeation hooks
   **/
-  static setupHooks(): void { 
+  static setupHooks(): void {
     FireLoop.driver.internal.on('create-hook', (event: any) => {
       FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: event.created });
     });
@@ -225,7 +225,7 @@ export class FireLoop {
           } else {
             switch (remoteEvent) {
               case 'find':
-                ctx.Model.find(_request.filter, { accessToken: ctx.socket.token },emit);
+                ctx.Model.find(_request.filter, { accessToken: ctx.socket.token }, emit);
                 break;
               case 'stats':
                 ctx.Model.stats(_request.filter.range || 'monthly', _request.filter.custom, _request.filter.where || {}, _request.filter.groupBy, emit);
@@ -725,15 +725,35 @@ export class FireLoop {
         }
       });
     } else if (ctx.subscription && FireLoop.options.app.models[ctx.subscription.scope].checkAccess) {
-      FireLoop.options.app.models[ctx.subscription.scope].checkAccess(ctx.socket.token, input && input.parent ? input.parent.id : null, {
-        name: event, aliases: []
-      }, {}, function (err: any, access: boolean) {
-        if (access) {
-          next(null, ref);
-        } else {
-          next(FireLoop.UNAUTHORIZED, ref);
+      const relationName: string = ctx.modelName.split('.').pop();
+      let methodName: string = '';
+      switch (event) {
+        case 'create':
+        case 'upsert':
+          methodName = `__create__${relationName}`;
+          break;
+        case 'remove':
+          methodName = `__delete__${relationName}`;
+          break;
+        default:
+          methodName = `__get__${relationName}`;
+      }
+      ctx.Model.checkAccess(
+        ctx.socket.token,
+        input && input.parent ? input.parent.id : null,
+        {
+          name: methodName, aliases: []
+        },
+        {},
+        function (err: Error, access: boolean) {
+          if (access) {
+            next(null, ref);
+          }
+          else {
+            next(FireLoop.UNAUTHORIZED, ref);
+          }
         }
-      });
+      );
     } else {
       RealTimeLog.log(`Reference not found for: ${ctx.subscription.scope}`);
       next(FireLoop.UNAUTHORIZED, ref);

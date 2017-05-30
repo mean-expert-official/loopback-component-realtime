@@ -1,3 +1,7 @@
+### version 1.0.0-rc.8.7
+
+- Hot Fix: Fix issue with scoped methods not executing the right context to Dynamic Roles
+
 ### version 1.0.0-rc.8.6
 
 - Hot Fix: Change findOne for findById on upsert method
