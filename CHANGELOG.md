@@ -1,3 +1,7 @@
+### version 1.0.0-rc.8.8
+
+- Fix: Fixed remove events not being triggered from backend
+
 ### version 1.0.0-rc.8.7
 
 - Hot Fix: Fix issue with scoped methods not executing the right context to Dynamic Roles

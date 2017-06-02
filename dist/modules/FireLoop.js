@@ -37,7 +37,11 @@ var FireLoop = (function () {
         FireLoop.setupHooks();
         // Setup Server Side Broadcasts
         Object.keys(FireLoop.options.app.models).forEach(function (modelName) {
-            // TODO: verify why this is not working: FireLoop.options.app.models[modelName].mixin('FireLoop');
+            // TODO: verify why this is not working -> FireLoop.options.app.models[modelName].mixin('FireLoop');
+            // Answer: There is a bug from LoopBack, it requires the mixin to be configured through json at least
+            // for 1 time, if the mixing is lodaded 1 time, then the mixin() would work, but is not the best solution.
+            // For now dev-users need to define the FireLoop mixin within the model.json file, for those models 
+            // The Real-Time functionality is needed.
             FireLoop.events.readings.forEach(function (event) {
                 FireLoop.setupServerBroadcast({ modelName: modelName }, event);
                 if (!FireLoop.options.app.models[modelName].sharedClass.ctor.relations)
@@ -120,6 +124,9 @@ var FireLoop = (function () {
     FireLoop.setupHooks = function () {
         FireLoop.driver.internal.on('create-hook', function (event) {
             FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: event.created });
+        });
+        FireLoop.driver.internal.on('delete-hook', function (event) {
+            FireLoop.publish({ modelName: event.modelName, err: null, input: null, removed: event.data });
         });
     };
     /**
@@ -471,6 +478,7 @@ var FireLoop = (function () {
     **/
     FireLoop.remove = function (ctx, input) {
         logger_1.RealTimeLog.log("FireLoop starting remove: " + ctx.modelName + ": " + JSON.stringify(input));
+        var isScoped = ctx.modelName.match(/\./g);
         async.waterfall([
             function (next) {
                 if (ctx.modelName.match(/\./g)) {
@@ -494,7 +502,9 @@ var FireLoop = (function () {
         ], function (err) {
             var resultContext = Object.assign({ err: err, input: input, removed: input.data }, ctx);
             FireLoop.response(resultContext);
-            FireLoop.publish(resultContext);
+            if (isScoped) {
+                FireLoop.publish(resultContext);
+            }
         });
     };
     /**

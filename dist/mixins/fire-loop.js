@@ -36,6 +36,13 @@ var FireLoopMixin = (function () {
             });
             next();
         });
+        Model.observe('after delete', function (ctx, next) {
+            Model.app.mx.IO.driver.server.to('flint').emit('delete-hook', {
+                modelName: ctx.Model.modelName,
+                data: ctx.where
+            });
+            next();
+        });
     }
     ;
     return FireLoopMixin;

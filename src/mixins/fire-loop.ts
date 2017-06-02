@@ -41,6 +41,14 @@ class FireLoopMixin {
         });
         next();
     });
+
+    Model.observe('after delete', (ctx: any, next: Function) => {
+        Model.app.mx.IO.driver.server.to('flint').emit('delete-hook', {
+          modelName: ctx.Model.modelName,
+          data: ctx.where
+        });
+        next();
+    });
   };
 }
 

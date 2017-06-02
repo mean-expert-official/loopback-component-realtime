@@ -72,7 +72,11 @@ export class FireLoop {
     FireLoop.setupHooks();
     // Setup Server Side Broadcasts
     Object.keys(FireLoop.options.app.models).forEach((modelName: string) => {
-      // TODO: verify why this is not working: FireLoop.options.app.models[modelName].mixin('FireLoop');
+      // TODO: verify why this is not working -> FireLoop.options.app.models[modelName].mixin('FireLoop');
+      // Answer: There is a bug from LoopBack, it requires the mixin to be configured through json at least
+      // for 1 time, if the mixing is lodaded 1 time, then the mixin() would work, but is not the best solution.
+      // For now dev-users need to define the FireLoop mixin within the model.json file, for those models 
+      // The Real-Time functionality is needed.
       FireLoop.events.readings.forEach((event: string) => {
         FireLoop.setupServerBroadcast({ modelName }, event);
         if (!FireLoop.options.app.models[modelName].sharedClass.ctor.relations) return;
@@ -157,6 +161,9 @@ export class FireLoop {
   static setupHooks(): void {
     FireLoop.driver.internal.on('create-hook', (event: any) => {
       FireLoop.publish({ modelName: event.modelName, err: null, input: null, data: event.data, created: event.created });
+    });
+    FireLoop.driver.internal.on('delete-hook', (event: any) => {
+      FireLoop.publish({ modelName: event.modelName, err: null, input: null, removed: event.data });
     });
   }
   /**
@@ -500,6 +507,7 @@ export class FireLoop {
   **/
   static remove(ctx: any, input: FireLoopData): void {
     RealTimeLog.log(`FireLoop starting remove: ${ctx.modelName}: ${JSON.stringify(input)}`);
+    let isScoped: boolean = ctx.modelName.match(/\./g);
     async.waterfall([
       (next: Function) => {
         if (ctx.modelName.match(/\./g)) {
@@ -521,7 +529,7 @@ export class FireLoop {
     ], (err: any) => {
       const resultContext = Object.assign({ err, input, removed: input.data }, ctx);
       FireLoop.response(resultContext);
-      FireLoop.publish(resultContext);
+      if (isScoped) { FireLoop.publish(resultContext); }
     });
   }
   /**
