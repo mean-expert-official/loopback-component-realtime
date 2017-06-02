@@ -4,7 +4,6 @@ import { OptionsInterface } from '../types/options';
 import { RealTimeLog } from '../logger';
 import * as server from 'socket.io';
 import * as client from 'socket.io-client';
-let ioAuth = require('socketio-auth');
 
 export class IODriver implements DriverInterface {
 
@@ -81,32 +80,34 @@ export class IODriver implements DriverInterface {
   setupAuthentication(): void {
     if (this.options.auth) {
       RealTimeLog.log('RTC authentication mechanism enabled');
-      ioAuth(this.server, {
-        authenticate: (socket: any, token: any, next: Function) => {
-          if (!token) return next(null, false)
+      this.server.on('connection', (socket: any) =>
+        socket.on('authentication', (token: any) => {
+          if (!token) {
+            socket.emit('unauthotirzed');
+            socket.removeAllListeners();
+            return socket.disconnect(0);
+          }
           if (token.is === '-*!#fl1nter#!*-') {
-            RealTimeLog.log('Internal connection has been established')
-            return next(null, true);
+            RealTimeLog.log('Internal connection has been established');
+            return socket.emit('authenticated');
           }
           var AccessToken = this.options.app.models.AccessToken;
           //verify credentials sent by the client
           var token = AccessToken.findOne({
             where: { id: token.id || 0 }
-          }, (err: any, tokenInstance: any) => {
+          }, function (err: Error, tokenInstance: any) {
             if (tokenInstance) {
               socket.token = tokenInstance;
-              next(err, true);
-            } else {
-              next(err, false);
+              socket.emit('authenticated');
+            }
+            else {
+              socket.emit('unauthotirzed');
+              socket.removeAllListeners();
+              socket.disconnect(0);
             }
           });
-        },
-        postAuthenticate: () => {
-          this.server.on('authentication', (value: any) => {
-            RealTimeLog.log(`A user ${value} has been authenticated over web sockets`);
-          });
-        }
-      });
+        })
+      );
     }
   }
   /**
@@ -168,7 +169,7 @@ export class IODriver implements DriverInterface {
   }
 
   getUserConnection(userId: string): void {
-    if (!userId || userId === '') return null;
+    if (!userId ||  userId === '') return null;
     let connection: any;
     this.forEachConnection((_connection: any) => {
       if (_connection.token && _connection.token.userId === userId) {

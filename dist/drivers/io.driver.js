@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var logger_1 = require("../logger");
 var server = require("socket.io");
 var client = require("socket.io-client");
-var ioAuth = require('socketio-auth');
 var IODriver = (function () {
     function IODriver() {
         this.connections = new Array();
@@ -72,13 +71,16 @@ var IODriver = (function () {
         var _this = this;
         if (this.options.auth) {
             logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
-            ioAuth(this.server, {
-                authenticate: function (socket, token, next) {
-                    if (!token)
-                        return next(null, false);
+            this.server.on('connection', function (socket) {
+                return socket.on('authentication', function (token) {
+                    if (!token) {
+                        socket.emit('unauthotirzed');
+                        socket.removeAllListeners();
+                        return socket.disconnect(0);
+                    }
                     if (token.is === '-*!#fl1nter#!*-') {
                         logger_1.RealTimeLog.log('Internal connection has been established');
-                        return next(null, true);
+                        return socket.emit('authenticated');
                     }
                     var AccessToken = _this.options.app.models.AccessToken;
                     //verify credentials sent by the client
@@ -87,18 +89,15 @@ var IODriver = (function () {
                     }, function (err, tokenInstance) {
                         if (tokenInstance) {
                             socket.token = tokenInstance;
-                            next(err, true);
+                            socket.emit('authenticated');
                         }
                         else {
-                            next(err, false);
+                            socket.emit('unauthotirzed');
+                            socket.removeAllListeners();
+                            socket.disconnect(0);
                         }
                     });
-                },
-                postAuthenticate: function () {
-                    _this.server.on('authentication', function (value) {
-                        logger_1.RealTimeLog.log("A user " + value + " has been authenticated over web sockets");
-                    });
-                }
+                });
             });
         }
     };

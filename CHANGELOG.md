@@ -1,3 +1,7 @@
+### version 1.0.0-rc.8.9
+
+- Hot Fix: Removed buggy socket.io-auth library and replaced for custom code.
+
 ### version 1.0.0-rc.8.8
 
 - Fix: Fixed remove events not being triggered from backend
