@@ -12,6 +12,7 @@ export class IODriver implements DriverInterface {
   internal: any;
   options: OptionsInterface;
   connections: Array<any> = new Array();
+  private customAuthListener: Function;
   /**
    * @method connect
    * @param {OptionsInterface} options
@@ -23,9 +24,24 @@ export class IODriver implements DriverInterface {
     this.server = server(options.server, { transports: options.driver.options.transports });
     this.onConnection((socket: any) => this.newConnection(socket));
     this.setupClustering();
+    this.setupAuthResolver();
     this.setupAuthentication();
     this.setupClient();
     this.setupInternal();
+    this.options.app.emit('fire-connection-started');
+  }
+  setupAuthResolver(): void {
+    if (this.options.auth) {
+      RealTimeLog.log('RTC requesting custom resolvers');
+      this.options.app.on('fire-auth-resolver', (authResolver: any) => {
+        if (!authResolver || !authResolver.name || !authResolver.handler) {
+          throw new Error('FireLoop: Custom auth resolver does not provide either name or handler');
+        }
+        this.server.on('connection', (socket: any) => {
+          socket.on(authResolver.name, (payload: any) => authResolver.handler(socket, payload))
+        });
+      });
+    }
   }
   /**
    * @method setupClustering
@@ -80,7 +96,10 @@ export class IODriver implements DriverInterface {
   setupAuthentication(): void {
     if (this.options.auth) {
       RealTimeLog.log('RTC authentication mechanism enabled');
-      this.server.on('connection', (socket: any) =>
+      this.server.on('connection', (socket: any) => {
+        /**
+         * Register Built in Auth Resolver
+         */
         socket.on('authentication', (token: any) => {
           if (!token) {
             socket.emit('unauthotirzed');
@@ -89,6 +108,7 @@ export class IODriver implements DriverInterface {
           }
           if (token.is === '-*!#fl1nter#!*-') {
             RealTimeLog.log('Internal connection has been established');
+            socket.token = token;
             return socket.emit('authenticated');
           }
           var AccessToken = this.options.app.models.AccessToken;
@@ -106,8 +126,20 @@ export class IODriver implements DriverInterface {
               socket.disconnect(0);
             }
           });
-        })
-      );
+        });
+        /**
+         * Wait 1 second for token to be available
+         * Or disconnect
+         **/
+        const to = setTimeout(() => {
+          if (!socket.token) {
+            socket.emit('unauthotirzed');
+            socket.removeAllListeners();
+            socket.disconnect(0);
+          }
+          clearTimeout(to);
+        }, 1000);
+      });
     }
   }
   /**
@@ -169,7 +201,7 @@ export class IODriver implements DriverInterface {
   }
 
   getUserConnection(userId: string): void {
-    if (!userId ||  userId === '') return null;
+    if (!userId || userId === '') return null;
     let connection: any;
     this.forEachConnection((_connection: any) => {
       if (_connection.token && _connection.token.userId === userId) {

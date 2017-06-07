@@ -19,9 +19,25 @@ var IODriver = (function () {
         this.server = server(options.server, { transports: options.driver.options.transports });
         this.onConnection(function (socket) { return _this.newConnection(socket); });
         this.setupClustering();
+        this.setupAuthResolver();
         this.setupAuthentication();
         this.setupClient();
         this.setupInternal();
+        this.options.app.emit('fire-connection-started');
+    };
+    IODriver.prototype.setupAuthResolver = function () {
+        var _this = this;
+        if (this.options.auth) {
+            logger_1.RealTimeLog.log('RTC requesting custom resolvers');
+            this.options.app.on('fire-auth-resolver', function (authResolver) {
+                if (!authResolver || !authResolver.name || !authResolver.handler) {
+                    throw new Error('FireLoop: Custom auth resolver does not provide either name or handler');
+                }
+                _this.server.on('connection', function (socket) {
+                    socket.on(authResolver.name, function (payload) { return authResolver.handler(socket, payload); });
+                });
+            });
+        }
     };
     /**
      * @method setupClustering
@@ -72,7 +88,10 @@ var IODriver = (function () {
         if (this.options.auth) {
             logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
             this.server.on('connection', function (socket) {
-                return socket.on('authentication', function (token) {
+                /**
+                 * Register Built in Auth Resolver
+                 */
+                socket.on('authentication', function (token) {
                     if (!token) {
                         socket.emit('unauthotirzed');
                         socket.removeAllListeners();
@@ -80,6 +99,7 @@ var IODriver = (function () {
                     }
                     if (token.is === '-*!#fl1nter#!*-') {
                         logger_1.RealTimeLog.log('Internal connection has been established');
+                        socket.token = token;
                         return socket.emit('authenticated');
                     }
                     var AccessToken = _this.options.app.models.AccessToken;
@@ -98,6 +118,18 @@ var IODriver = (function () {
                         }
                     });
                 });
+                /**
+                 * Wait 1 second for token to be available
+                 * Or disconnect
+                 **/
+                var to = setTimeout(function () {
+                    if (!socket.token) {
+                        socket.emit('unauthotirzed');
+                        socket.removeAllListeners();
+                        socket.disconnect(0);
+                    }
+                    clearTimeout(to);
+                }, 1000);
             });
         }
     };
