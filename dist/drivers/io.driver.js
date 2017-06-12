@@ -38,12 +38,8 @@ var IODriver = (function () {
                     socket.on(authResolver.name, function (payload) {
                         return authResolver.handler(socket, payload, function (token) {
                             if (token) {
+                                _this.restoreNameSpaces(socket);
                                 socket.token = token;
-                                _.each(_this.server.nsps, function (nsp) {
-                                    if (_.findWhere(nsp.sockets, { id: socket.id })) {
-                                        nsp.connected[socket.id] = socket;
-                                    }
-                                });
                                 socket.emit('authenticated');
                             }
                         });
@@ -118,6 +114,7 @@ var IODriver = (function () {
                     }
                     if (token.is === '-*!#fl1nter#!*-') {
                         logger_1.RealTimeLog.log('Internal connection has been established');
+                        _this.restoreNameSpaces(socket);
                         socket.token = token;
                         return socket.emit('authenticated');
                     }
@@ -127,13 +124,9 @@ var IODriver = (function () {
                         where: { id: token.id || 0 }
                     }, function (err, tokenInstance) {
                         if (tokenInstance) {
+                            _this.restoreNameSpaces(socket);
                             socket.token = tokenInstance;
                             socket.emit('authenticated');
-                            _.each(_this.server.nsps, function (nsp) {
-                                if (_.findWhere(nsp.sockets, { id: socket.id })) {
-                                    nsp.connected[socket.id] = socket;
-                                }
-                            });
                         }
                     });
                 });
@@ -241,6 +234,13 @@ var IODriver = (function () {
         });
         socket.on('lb-ping', function () { return socket.emit('lb-pong', new Date().getTime() / 1000); });
         socket.on('fl-reg', function () { return socket.join('flint'); });
+    };
+    IODriver.prototype.restoreNameSpaces = function (socket) {
+        _.each(this.server.nsps, function (nsp) {
+            if (_.findWhere(nsp.sockets, { id: socket.id })) {
+                nsp.connected[socket.id] = socket;
+            }
+        });
     };
     return IODriver;
 }());

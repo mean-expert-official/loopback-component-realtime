@@ -42,12 +42,8 @@ export class IODriver implements DriverInterface {
           socket.on(authResolver.name, (payload: any) =>
             authResolver.handler(socket, payload, (token: any) => {
               if (token) {
+                this.restoreNameSpaces(socket);
                 socket.token = token;
-                _.each(this.server.nsps, (nsp: any) => {
-                  if (_.findWhere(nsp.sockets, { id: socket.id })) {
-                    nsp.connected[socket.id] = socket;
-                  }
-                });
                 socket.emit('authenticated');
               }
             }
@@ -127,6 +123,7 @@ export class IODriver implements DriverInterface {
           }
           if (token.is === '-*!#fl1nter#!*-') {
             RealTimeLog.log('Internal connection has been established');
+            this.restoreNameSpaces(socket);
             socket.token = token;
             return socket.emit('authenticated');
           }
@@ -136,13 +133,9 @@ export class IODriver implements DriverInterface {
             where: { id: token.id || 0 }
           }, (err: Error, tokenInstance: any) => {
             if (tokenInstance) {
+              this.restoreNameSpaces(socket);
               socket.token = tokenInstance;
               socket.emit('authenticated');
-              _.each(this.server.nsps, (nsp: any) => {
-                if (_.findWhere(nsp.sockets, { id: socket.id })) {
-                  nsp.connected[socket.id] = socket;
-                }
-              });
             }
           });
         });
@@ -253,5 +246,13 @@ export class IODriver implements DriverInterface {
     });
     socket.on('lb-ping', () => socket.emit('lb-pong', new Date().getTime() / 1000));
     socket.on('fl-reg', () => socket.join('flint'))
+  }
+
+  restoreNameSpaces(socket: any):void {
+    _.each(this.server.nsps, (nsp: any) => {
+      if (_.findWhere(nsp.sockets, { id: socket.id })) {
+        nsp.connected[socket.id] = socket;
+      }
+    });
   }
 }
