@@ -4,6 +4,7 @@ import { OptionsInterface } from '../types/options';
 import { RealTimeLog } from '../logger';
 import * as server from 'socket.io';
 import * as client from 'socket.io-client';
+import * as _ from 'underscore';
 
 export class IODriver implements DriverInterface {
 
@@ -34,11 +35,23 @@ export class IODriver implements DriverInterface {
     if (this.options.auth) {
       RealTimeLog.log('RTC requesting custom resolvers');
       this.options.app.on('fire-auth-resolver', (authResolver: any) => {
-        if (!authResolver || !authResolver.name || !authResolver.handler) {
+        if (!authResolver || !authResolver.name || !authResolver.handler) {
           throw new Error('FireLoop: Custom auth resolver does not provide either name or handler');
         }
         this.server.on('connection', (socket: any) => {
-          socket.on(authResolver.name, (payload: any) => authResolver.handler(socket, payload))
+          socket.on(authResolver.name, (payload: any) =>
+            authResolver.handler(socket, payload, (token: any) => {
+              if (token) {
+                socket.token = token;
+                _.each(this.server.nsps, (nsp: any) => {
+                  if (_.findWhere(nsp.sockets, { id: socket.id })) {
+                    nsp.connected[socket.id] = socket;
+                  }
+                });
+                socket.emit('authenticated');
+              }
+            }
+          ))
         });
       });
     }
@@ -47,7 +60,7 @@ export class IODriver implements DriverInterface {
    * @method setupClustering
    * @description Will setup socket.io adapters. This module is adapter agnostic, it means
    * it can use any valid socket.io-adapter, can either be redis or mongo. It will be setup
-   * according the provided options.
+   * according the provided options. 8990021
    **/
   setupClustering(): void {
     if (
@@ -96,15 +109,21 @@ export class IODriver implements DriverInterface {
   setupAuthentication(): void {
     if (this.options.auth) {
       RealTimeLog.log('RTC authentication mechanism enabled');
+      // Remove Unauthenticated sockets from namespaces
+      _.each(this.server.nsps, (nsp: any) => {
+        nsp.on('connect', (socket: any) => {
+          if (!socket.token) {
+            delete nsp.connected[socket.id];
+          }
+        });
+      });
       this.server.on('connection', (socket: any) => {
         /**
          * Register Built in Auth Resolver
          */
         socket.on('authentication', (token: any) => {
           if (!token) {
-            socket.emit('unauthotirzed');
-            socket.removeAllListeners();
-            return socket.disconnect(0);
+            return;
           }
           if (token.is === '-*!#fl1nter#!*-') {
             RealTimeLog.log('Internal connection has been established');
@@ -115,15 +134,15 @@ export class IODriver implements DriverInterface {
           //verify credentials sent by the client
           var token = AccessToken.findOne({
             where: { id: token.id || 0 }
-          }, function (err: Error, tokenInstance: any) {
+          }, (err: Error, tokenInstance: any) => {
             if (tokenInstance) {
               socket.token = tokenInstance;
               socket.emit('authenticated');
-            }
-            else {
-              socket.emit('unauthotirzed');
-              socket.removeAllListeners();
-              socket.disconnect(0);
+              _.each(this.server.nsps, (nsp: any) => {
+                if (_.findWhere(nsp.sockets, { id: socket.id })) {
+                  nsp.connected[socket.id] = socket;
+                }
+              });
             }
           });
         });
@@ -133,12 +152,11 @@ export class IODriver implements DriverInterface {
          **/
         const to = setTimeout(() => {
           if (!socket.token) {
-            socket.emit('unauthotirzed');
-            socket.removeAllListeners();
-            socket.disconnect(0);
+            socket.emit('unauthorized');
+            socket.disconnect(1);
           }
           clearTimeout(to);
-        }, 1000);
+        }, 3000);
       });
     }
   }

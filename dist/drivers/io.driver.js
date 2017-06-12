@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var logger_1 = require("../logger");
 var server = require("socket.io");
 var client = require("socket.io-client");
+var _ = require("underscore");
 var IODriver = (function () {
     function IODriver() {
         this.connections = new Array();
@@ -34,7 +35,19 @@ var IODriver = (function () {
                     throw new Error('FireLoop: Custom auth resolver does not provide either name or handler');
                 }
                 _this.server.on('connection', function (socket) {
-                    socket.on(authResolver.name, function (payload) { return authResolver.handler(socket, payload); });
+                    socket.on(authResolver.name, function (payload) {
+                        return authResolver.handler(socket, payload, function (token) {
+                            if (token) {
+                                socket.token = token;
+                                _.each(_this.server.nsps, function (nsp) {
+                                    if (_.findWhere(nsp.sockets, { id: socket.id })) {
+                                        nsp.connected[socket.id] = socket;
+                                    }
+                                });
+                                socket.emit('authenticated');
+                            }
+                        });
+                    });
                 });
             });
         }
@@ -43,7 +56,7 @@ var IODriver = (function () {
      * @method setupClustering
      * @description Will setup socket.io adapters. This module is adapter agnostic, it means
      * it can use any valid socket.io-adapter, can either be redis or mongo. It will be setup
-     * according the provided options.
+     * according the provided options. 8990021
      **/
     IODriver.prototype.setupClustering = function () {
         if (this.options.driver.options.adapter &&
@@ -87,15 +100,21 @@ var IODriver = (function () {
         var _this = this;
         if (this.options.auth) {
             logger_1.RealTimeLog.log('RTC authentication mechanism enabled');
+            // Remove Unauthenticated sockets from namespaces
+            _.each(this.server.nsps, function (nsp) {
+                nsp.on('connect', function (socket) {
+                    if (!socket.token) {
+                        delete nsp.connected[socket.id];
+                    }
+                });
+            });
             this.server.on('connection', function (socket) {
                 /**
                  * Register Built in Auth Resolver
                  */
                 socket.on('authentication', function (token) {
                     if (!token) {
-                        socket.emit('unauthotirzed');
-                        socket.removeAllListeners();
-                        return socket.disconnect(0);
+                        return;
                     }
                     if (token.is === '-*!#fl1nter#!*-') {
                         logger_1.RealTimeLog.log('Internal connection has been established');
@@ -110,11 +129,11 @@ var IODriver = (function () {
                         if (tokenInstance) {
                             socket.token = tokenInstance;
                             socket.emit('authenticated');
-                        }
-                        else {
-                            socket.emit('unauthotirzed');
-                            socket.removeAllListeners();
-                            socket.disconnect(0);
+                            _.each(_this.server.nsps, function (nsp) {
+                                if (_.findWhere(nsp.sockets, { id: socket.id })) {
+                                    nsp.connected[socket.id] = socket;
+                                }
+                            });
                         }
                     });
                 });
@@ -124,12 +143,11 @@ var IODriver = (function () {
                  **/
                 var to = setTimeout(function () {
                     if (!socket.token) {
-                        socket.emit('unauthotirzed');
-                        socket.removeAllListeners();
-                        socket.disconnect(0);
+                        socket.emit('unauthorized');
+                        socket.disconnect(1);
                     }
                     clearTimeout(to);
-                }, 1000);
+                }, 3000);
             });
         }
     };

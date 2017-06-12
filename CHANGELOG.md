@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.1
+
+- Feature: Fixed authentication flow issues
+
 ### version 1.0.0-rc.9
 
 - Feature: Implemented custom authentication strategy resolver

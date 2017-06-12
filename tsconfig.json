@@ -16,7 +16,8 @@
       "chalk",
       "async",
       "socket.io",
-      "socket.io-client"
+      "socket.io-client",
+      "underscore"
     ]
   },
   "exclude": [
