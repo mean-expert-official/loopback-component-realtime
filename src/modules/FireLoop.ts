@@ -483,7 +483,11 @@ export class FireLoop {
       (ref: any, inst: any, next: Function) => {
         if (inst) {
           created = false;
-          Object.keys(input.data).forEach((key: string) => inst[key] = input.data[key]);
+          Object.keys(input.data).forEach((key: string) => {
+            if (typeof inst[key] !== 'function') {
+              inst[key] = input.data[key];
+            }
+          });
           inst.save({ accessToken: ctx.socket.token }, next);
         } else {
           created = true;

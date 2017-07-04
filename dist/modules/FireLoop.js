@@ -451,7 +451,11 @@ var FireLoop = (function () {
             function (ref, inst, next) {
                 if (inst) {
                     created = false;
-                    Object.keys(input.data).forEach(function (key) { return inst[key] = input.data[key]; });
+                    Object.keys(input.data).forEach(function (key) {
+                        if (typeof inst[key] !== 'function') {
+                            inst[key] = input.data[key];
+                        }
+                    });
                     inst.save({ accessToken: ctx.socket.token }, next);
                 }
                 else {

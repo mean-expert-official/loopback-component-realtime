@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.3
+
+- Feature: Hot Fix crash while upserting related data
+
 ### version 1.0.0-rc.9.2
 
 - Feature: Hot Fix internal namespaces restore
