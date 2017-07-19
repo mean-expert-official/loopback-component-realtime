@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.4
+
+- Feature: Implemented secure SSL connections
+
 ### version 1.0.0-rc.9.3
 
 - Feature: Hot Fix crash while upserting related data

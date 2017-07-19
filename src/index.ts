@@ -34,6 +34,7 @@ class RealTime {
     },
     debug   : false,
     auth    : true,
+    secure  : false,
     modules : [ /*'PubSub' Deprecated,*/'IO', 'FireLoop' /*, 'WebRTCSignaler'  Not yet implemented */]
   };
 

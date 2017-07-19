@@ -152,8 +152,9 @@ var IODriver = (function () {
     IODriver.prototype.setupClient = function () {
         var _this = this;
         // Passing transport options if any (Mostly for clustered environments)
-        this.client = client("http://127.0.0.1:" + this.options.app.get('port'), {
-            transports: ['websocket']
+        this.client = client("http" + (this.options.secure ? 's' : '') + "://127.0.0.1:" + this.options.app.get('port'), {
+            transports: ['websocket'],
+            secure: this.options.secure
         });
         this.client.on('connect', function () {
             if (_this.options.auth) {
@@ -171,8 +172,9 @@ var IODriver = (function () {
     IODriver.prototype.setupInternal = function () {
         var _this = this;
         // Passing transport options if any (Mostly for clustered environments)
-        this.internal = client("http://127.0.0.1:" + this.options.app.get('port'), {
-            transports: ['websocket']
+        this.internal = client("http" + (this.options.secure ? 's' : '') + "://127.0.0.1:" + this.options.app.get('port'), {
+            transports: ['websocket'],
+            secure: this.options.secure
         });
         this.internal.on('connect', function () {
             if (_this.options.auth) {

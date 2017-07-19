@@ -11,6 +11,7 @@ export interface OptionsInterface {
   server ?: any,
   debug   : boolean,
   auth   ?: boolean,
+  secure  : boolean, 
   driver  : {
     url     ?: string,
     name     : string,

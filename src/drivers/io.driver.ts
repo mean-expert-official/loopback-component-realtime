@@ -160,8 +160,9 @@ export class IODriver implements DriverInterface {
    **/
   setupClient(): void {
     // Passing transport options if any (Mostly for clustered environments)
-    this.client = client(`http://127.0.0.1:${this.options.app.get('port')}`, {
-      transports: ['websocket']
+    this.client = client(`http${this.options.secure ? 's' : ''}://127.0.0.1:${this.options.app.get('port')}`, {
+      transports: ['websocket'],
+      secure: this.options.secure
     });
     this.client.on('connect', () => {
       if (this.options.auth) {
@@ -178,8 +179,9 @@ export class IODriver implements DriverInterface {
    **/
   setupInternal(): void {
     // Passing transport options if any (Mostly for clustered environments)
-    this.internal = client(`http://127.0.0.1:${this.options.app.get('port')}`, {
-      transports: ['websocket']
+    this.internal = client(`http${this.options.secure ? 's' : ''}://127.0.0.1:${this.options.app.get('port')}`, {
+      transports: ['websocket'],
+      secure: this.options.secure
     });
     this.internal.on('connect', () => {
       if (this.options.auth) {
