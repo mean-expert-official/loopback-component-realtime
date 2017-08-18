@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.5
+
+- Fix: Fixed issues with unreleased subscription contexts
+
 ### version 1.0.0-rc.9.4
 
 - Feature: Implemented secure SSL connections

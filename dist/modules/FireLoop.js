@@ -106,6 +106,12 @@ var FireLoop = (function () {
             FireLoop.disposeModelReadings(ctx);
             // Dispose Scope Readings
             FireLoop.disposeScopeReadings(ctx);
+            // Remove Context 
+            setInterval(function () {
+                if (FireLoop.contexts[ctx.socket.connContextId] &&
+                    FireLoop.contexts[ctx.socket.connContextId][ctx.id])
+                    delete FireLoop.contexts[ctx.socket.connContextId][ctx.id];
+            });
         });
     };
     /**
