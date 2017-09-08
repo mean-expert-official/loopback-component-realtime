@@ -329,7 +329,15 @@ export class FireLoop {
           switch (event) {
             case 'value':
             case 'change':
-              FireLoop.getReference(_ctx.modelName, request, (ref: any) => ref(_filter, emit));
+              FireLoop.getReference(_ctx.modelName, request, (ref: any) => {
+                if (!ref) {
+                  const error = { error: `${ctx.modelName} Model reference was not found.` };
+                  RealTimeLog.log(error);
+                  emit(error);
+                } else {
+                  ref(_filter, emit)
+                }
+              });
               break;
             case 'stats':
               RealTimeLog.log('Stats are currently only for root models');
@@ -367,7 +375,7 @@ export class FireLoop {
       if (!input || !input.parent) return next(null);
       let segments: string[] = modelName.split('.');
       let parent: any = FireLoop.options.app.models[segments[0]] || null;
-      if (!parent) return null;
+      if (!parent) return next(null);
       let idName: any = parent.getIdName();
       let filter: any = { where: {} };
       filter.where[idName] = input.parent[idName];
@@ -377,8 +385,8 @@ export class FireLoop {
       });
     } else {
       ref = FireLoop.options.app.models[modelName] || null;
+      next(ref);
     }
-    next(ref);
   }
   /**
   * @method remote
@@ -687,7 +695,13 @@ export class FireLoop {
         // Get Reference
         (next: Function) => {
           if (ctx.modelName.match(/\./g)) {
-            FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => next(null, ref));
+            FireLoop.getReference(ctx.modelName, ctx.input, (ref: any) => {
+              if (!ref) {
+                next({ error: `${ctx.modelName} Model reference was not found.` });
+              } else {
+                next(null, ref);
+              }
+            });
           } else {
             next(null, ctx.Model);
           }

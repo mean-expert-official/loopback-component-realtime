@@ -127,7 +127,9 @@ export class IODriver implements DriverInterface {
             socket.token = token;
             return socket.emit('authenticated');
           }
-          var AccessToken = this.options.app.models.AccessToken;
+          var AccessToken = this.options.custom && this.options.custom.AccessToken
+                          ? this.options.app.models[this.options.custom.AccessToken]
+                          : this.options.app.models.AccessToken;
           //verify credentials sent by the client
           var token = AccessToken.findOne({
             where: { id: token.id || 0 }

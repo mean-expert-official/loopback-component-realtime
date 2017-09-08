@@ -12,6 +12,9 @@ export interface OptionsInterface {
   debug   : boolean,
   auth   ?: boolean,
   secure  : boolean, 
+  custom ?: {
+   AccessToken?: string
+  },
   driver  : {
     url     ?: string,
     name     : string,

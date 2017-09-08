@@ -1,6 +1,6 @@
 {
   "name": "@mean-expert/loopback-component-realtime",
-  "version": "1.0.0-rc.9.5",
+  "version": "1.0.0-rc.9.6",
   "description": "The LoopBack Component that turns this great framework into a powerful real-time platform",
   "main": "index.js",
   "scripts": {

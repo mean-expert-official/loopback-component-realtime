@@ -284,7 +284,16 @@ var FireLoop = (function () {
                 switch (event) {
                     case 'value':
                     case 'change':
-                        FireLoop.getReference(_ctx.modelName, request, function (ref) { return ref(_filter, emit); });
+                        FireLoop.getReference(_ctx.modelName, request, function (ref) {
+                            if (!ref) {
+                                var error = { error: ctx.modelName + " Model reference was not found." };
+                                logger_1.RealTimeLog.log(error);
+                                emit(error);
+                            }
+                            else {
+                                ref(_filter, emit);
+                            }
+                        });
                         break;
                     case 'stats':
                         logger_1.RealTimeLog.log('Stats are currently only for root models');
@@ -324,7 +333,7 @@ var FireLoop = (function () {
             var segments_1 = modelName.split('.');
             var parent_1 = FireLoop.options.app.models[segments_1[0]] || null;
             if (!parent_1)
-                return null;
+                return next(null);
             var idName = parent_1.getIdName();
             var filter = { where: {} };
             filter.where[idName] = input.parent[idName];
@@ -335,8 +344,8 @@ var FireLoop = (function () {
         }
         else {
             ref = FireLoop.options.app.models[modelName] || null;
+            next(ref);
         }
-        next(ref);
     };
     /**
     * @method remote
@@ -659,7 +668,14 @@ var FireLoop = (function () {
                 // Get Reference
                 function (next) {
                     if (ctx.modelName.match(/\./g)) {
-                        FireLoop.getReference(ctx.modelName, ctx.input, function (ref) { return next(null, ref); });
+                        FireLoop.getReference(ctx.modelName, ctx.input, function (ref) {
+                            if (!ref) {
+                                next({ error: ctx.modelName + " Model reference was not found." });
+                            }
+                            else {
+                                next(null, ref);
+                            }
+                        });
                     }
                     else {
                         next(null, ctx.Model);

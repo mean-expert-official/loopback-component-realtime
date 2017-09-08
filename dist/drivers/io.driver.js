@@ -118,7 +118,9 @@ var IODriver = (function () {
                         socket.token = token;
                         return socket.emit('authenticated');
                     }
-                    var AccessToken = _this.options.app.models.AccessToken;
+                    var AccessToken = _this.options.custom && _this.options.custom.AccessToken
+                        ? _this.options.app.models[_this.options.custom.AccessToken]
+                        : _this.options.app.models.AccessToken;
                     //verify credentials sent by the client
                     var token = AccessToken.findOne({
                         where: { id: token.id || 0 }

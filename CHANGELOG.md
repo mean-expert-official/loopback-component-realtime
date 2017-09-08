@@ -1,3 +1,8 @@
+### version 1.0.0-rc.9.6
+
+- Feature: Implemented Custom Access token
+- Fix: Fixed missing value when requesting model reference
+
 ### version 1.0.0-rc.9.5
 
 - Fix: Fixed issues with unreleased subscription contexts
