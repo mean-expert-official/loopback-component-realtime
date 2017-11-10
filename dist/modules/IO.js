@@ -10,7 +10,7 @@ var logger_1 = require("../logger");
  * This module is created to implement IO Functionality into the LoopBack Framework.
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  **/
-var IO = (function () {
+var IO = /** @class */ (function () {
     function IO(driver, options) {
         logger_1.RealTimeLog.log("IO server enabled using " + options.driver.name + " driver.");
         IO.driver = driver;
@@ -26,4 +26,4 @@ var IO = (function () {
     return IO;
 }());
 exports.IO = IO;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/IO.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/modules/IO.js.map

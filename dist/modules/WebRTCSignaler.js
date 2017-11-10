@@ -10,7 +10,7 @@ var logger_1 = require("../logger");
  * This module is created to implement WebRTC Functionality into the LoopBack Framework.
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  **/
-var WebRTCSignaler = (function () {
+var WebRTCSignaler = /** @class */ (function () {
     function WebRTCSignaler(driver, options) {
         logger_1.RealTimeLog.log("WebRTCSignaler server enabled using " + options.driver.name + " driver.");
         WebRTCSignaler.driver = driver;
@@ -58,8 +58,8 @@ var WebRTCSignaler = (function () {
             });
         });
     };
+    WebRTCSignaler.channels = {};
     return WebRTCSignaler;
 }());
-WebRTCSignaler.channels = {};
 exports.WebRTCSignaler = WebRTCSignaler;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/WebRTCSignaler.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/modules/WebRTCSignaler.js.map

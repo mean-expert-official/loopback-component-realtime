@@ -26,7 +26,7 @@ var LoopBackContext = require('loopback-context');
  *
  *  When sending a message, we may want to include the owner account.
  */
-var PubSubMixin = (function () {
+var PubSubMixin = /** @class */ (function () {
     function PubSubMixin(Model, options) {
         options = Object.assign({ filters: {} }, options);
         Model.afterRemote('**', function (ctx, remoteMethodOutput, next) {
@@ -156,4 +156,4 @@ var PubSubMixin = (function () {
     return PubSubMixin;
 }());
 module.exports = PubSubMixin;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/mixins/pub-sub.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/mixins/pub-sub.js.map

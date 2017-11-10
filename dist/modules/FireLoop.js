@@ -11,7 +11,7 @@ var async = require("async");
  * This module is created to implement IO Functionality into the LoopBack Framework.
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  **/
-var FireLoop = (function () {
+var FireLoop = /** @class */ (function () {
     /**
     * @method constructor
     * @param driver: DriverInterface
@@ -338,7 +338,7 @@ var FireLoop = (function () {
             var filter = { where: {} };
             filter.where[idName] = input.parent[idName];
             return parent_1.findOne(filter, function (err, instance) {
-                ref = instance[segments_1[1]] || null;
+                ref = instance ? instance[segments_1[1]] || null : null;
                 next(ref);
             });
         }
@@ -777,26 +777,26 @@ var FireLoop = (function () {
             return id;
         }
     };
+    /**
+     * @property UNAUTHORIZED: string
+     * Constant for UNAUTHORIZED Events
+     **/
+    FireLoop.UNAUTHORIZED = '401 Unauthorized Event';
+    /**
+     * @property events: OptionsInterface
+     * The options object that are injected from the main module
+     **/
+    FireLoop.events = {
+        readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
+        writings: ['create', 'upsert', 'remove'],
+    };
+    /**
+     * @property context {[ id: number ]: {[ id: number ]: Object }}
+     * Context container, it will temporally store contexts. These
+     * are automatically deleted when client disconnects.
+     **/
+    FireLoop.contexts = {};
     return FireLoop;
 }());
-/**
- * @property UNAUTHORIZED: string
- * Constant for UNAUTHORIZED Events
- **/
-FireLoop.UNAUTHORIZED = '401 Unauthorized Event';
-/**
- * @property events: OptionsInterface
- * The options object that are injected from the main module
- **/
-FireLoop.events = {
-    readings: ['value', 'change', 'child_added', 'child_updated', 'child_removed', 'stats'],
-    writings: ['create', 'upsert', 'remove'],
-};
-/**
- * @property context {[ id: number ]: {[ id: number ]: Object }}
- * Context container, it will temporally store contexts. These
- * are automatically deleted when client disconnects.
- **/
-FireLoop.contexts = {};
 exports.FireLoop = FireLoop;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/FireLoop.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/modules/FireLoop.js.map

@@ -70,6 +70,7 @@ class RealTime {
       RealTime.options.app.mx[_module] =
       require(`./modules/${_module}`)[_module](RealTime.driver, RealTime.options)
     );
+    RealTime.options.app.emit('realtime-loaded');
   }
 }
 

@@ -380,7 +380,7 @@ export class FireLoop {
       let filter: any = { where: {} };
       filter.where[idName] = input.parent[idName];
       return parent.findOne(filter, (err: any, instance: any) => {
-        ref = instance[segments[1]] || null;
+        ref = instance ? instance[segments[1]] || null : null;
         next(ref);
       });
     } else {

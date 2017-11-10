@@ -4,7 +4,7 @@ var logger_1 = require("../logger");
 var server = require("socket.io");
 var client = require("socket.io-client");
 var _ = require("underscore");
-var IODriver = (function () {
+var IODriver = /** @class */ (function () {
     function IODriver() {
         this.connections = new Array();
     }
@@ -249,4 +249,4 @@ var IODriver = (function () {
     return IODriver;
 }());
 exports.IODriver = IODriver;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/drivers/io.driver.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/drivers/io.driver.js.map

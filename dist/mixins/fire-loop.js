@@ -25,7 +25,7 @@ var LoopBackContext = require('loopback-context');
  *
  *  When sending a message, we may want to include the owner account.
  */
-var FireLoopMixin = (function () {
+var FireLoopMixin = /** @class */ (function () {
     function FireLoopMixin(Model, options) {
         options = Object.assign({ filters: {} }, options);
         Model.observe('after save', function (ctx, next) {
@@ -48,4 +48,4 @@ var FireLoopMixin = (function () {
     return FireLoopMixin;
 }());
 module.exports = FireLoopMixin;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/mixins/fire-loop.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/mixins/fire-loop.js.map

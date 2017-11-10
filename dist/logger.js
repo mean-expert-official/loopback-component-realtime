@@ -8,15 +8,15 @@ var chalk = require("chalk");
 * @description
 * Console Log wrapper that can be disabled in production mode
 **/
-var RealTimeLog = (function () {
+var RealTimeLog = /** @class */ (function () {
     function RealTimeLog() {
     }
     RealTimeLog.log = function (input) {
         if (RealTimeLog.options.debug)
             console.log(chalk.yellow(this.namespace + ": " + input));
     };
+    RealTimeLog.namespace = '@mean-expert/loopback-component-realtime';
     return RealTimeLog;
 }());
-RealTimeLog.namespace = '@mean-expert/loopback-component-realtime';
 exports.RealTimeLog = RealTimeLog;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/logger.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/logger.js.map

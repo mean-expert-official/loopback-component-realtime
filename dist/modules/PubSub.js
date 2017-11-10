@@ -10,7 +10,7 @@ var logger_1 = require("../logger");
  * This module is created to implement PubSub Functionality into the LoopBack Framework.
  * This works with the SDK Builder and as a module of the FireLoop.io Framework
  */
-var PubSub = (function () {
+var PubSub = /** @class */ (function () {
     function PubSub(driver, options) {
         logger_1.RealTimeLog.log("PubSub server enabled using " + options.driver.name + " driver.");
         PubSub.driver = driver;
@@ -38,4 +38,4 @@ var PubSub = (function () {
     return PubSub;
 }());
 exports.PubSub = PubSub;
-//# sourceMappingURL=/Volumes/HD710M/development/www/mean.expert/@mean-expert/loopback-component-realtime/src/modules/PubSub.js.map
+//# sourceMappingURL=/Volumes/BACKUP/development/loopback-component-realtime/src/modules/PubSub.js.map

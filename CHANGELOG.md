@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.7
+
+- Hot Fix: fix null references on scope methods
+
 ### version 1.0.0-rc.9.6
 
 - Feature: Implemented Custom Access token
