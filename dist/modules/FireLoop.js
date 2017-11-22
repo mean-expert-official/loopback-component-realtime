@@ -107,7 +107,7 @@ var FireLoop = /** @class */ (function () {
             // Dispose Scope Readings
             FireLoop.disposeScopeReadings(ctx);
             // Remove Context 
-            setInterval(function () {
+            process.nextTick(function () {
                 if (FireLoop.contexts[ctx.socket.connContextId] &&
                     FireLoop.contexts[ctx.socket.connContextId][ctx.id])
                     delete FireLoop.contexts[ctx.socket.connContextId][ctx.id];

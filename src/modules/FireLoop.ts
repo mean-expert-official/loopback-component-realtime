@@ -143,7 +143,7 @@ export class FireLoop {
         // Dispose Scope Readings
         FireLoop.disposeScopeReadings(ctx);
         // Remove Context 
-        setInterval(() => {
+        process.nextTick(() => {
             if (
               FireLoop.contexts[ctx.socket.connContextId] &&
               FireLoop.contexts[ctx.socket.connContextId][ctx.id]

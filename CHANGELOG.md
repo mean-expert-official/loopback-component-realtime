@@ -1,3 +1,7 @@
+### version 1.0.0-rc.9.8
+
+- Hot Fix: hot fix evil setInterval creating CPU issues.
+
 ### version 1.0.0-rc.9.7
 
 - Hot Fix: fix null references on scope methods
