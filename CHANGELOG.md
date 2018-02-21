@@ -1,3 +1,8 @@
+### version 1.0.0
+
+- Stable Release
+- Fixed scalability issues.
+
 ### version 1.0.0-rc.9.8
 
 - Hot Fix: hot fix evil setInterval creating CPU issues.

@@ -45,8 +45,9 @@ class RealTime {
     } else {
       app.on('started', (server: any) => {
         app.mx = app.mx || {};
-        if (options.driver && !options.driver.options) {
-          options.driver.options = RealTime.options.driver.options;
+        if (options.driver && options.driver.options) {
+          Object.assign(options.driver.options, RealTime.options.driver.options);
+          Object.assign(RealTime.options.driver, options.driver);
         }
         RealTime.options = Object.assign(RealTime.options, options, {
           app    : app,
