@@ -1,3 +1,7 @@
+### version 1.0.1
+
+- Upgraded dependency versions
+
 ### version 1.0.0
 
 - Stable Release
