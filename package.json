@@ -34,7 +34,7 @@
     "url": "https://github.com/mean-expert-official/loopback-component-realtime"
   },
   "dependencies": {
-    "async": "^2.6.1",
+    "async": "^3.2.2",
     "chalk": "^2.4.1",
     "loopback-context": "^1.0.0",
     "socket.io": "^2.1.1",
